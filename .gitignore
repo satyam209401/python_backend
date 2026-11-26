@@ -1,0 +1,34 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+pyenv/
+venv/
+.env
+!.env.example
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+test/
+security_audit/
+cache/
+
+# Databases
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+db/*.sqlite
+!db/.gitkeep
+
+logs/*
+!logs/.gitkeep
+
+.vscode/
+.idea/
+
+# Keys / Cryptography
+*.pem
+
