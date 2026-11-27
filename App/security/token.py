@@ -6,12 +6,18 @@ import hmac
 import json
 import os
 import re
+import secrets
 import time
 from typing import Any
 
 
-class TokenManager:
-    CONTEXT = "SWARG-MARG-TOKEN-V1"
+class _TokenMeta(type):
+    def __call__(cls, length: int = 32, mode: str = "hex") -> str:
+        return cls.random(length=length, mode=mode)
+
+
+class TokenManager(metaclass=_TokenMeta):
+    CONTEXT = "ufACXToAV44EqAFc"
     JTI_LENGTH = 64
     MAX_PAYLOAD = 500_000
     VERSION = 1
@@ -348,5 +354,39 @@ class TokenManager:
                 "error": error,
             }
 
+    # ------------------------------------------------------------------
+    # Random Unique Token Generator (32 / 64 characters)
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def random(cls, length: int = 32, mode: str = "hex") -> str:
+        """
+        Generates a cryptographically secure, globally unique token.
+        :param length: Desired length in characters (default 32, or 64)
+        :param mode: 'hex' (0-9a-f), 'urlsafe' (A-Za-z0-9-_), or 'alphanumeric'
+        :return: Unique token string
+        """
+        if length <= 0:
+            length = 32
+
+        if mode == "hex":
+            nbytes = (length + 1) // 2
+            return secrets.token_hex(nbytes)[:length]
+        elif mode == "urlsafe":
+            nbytes = (length * 3 + 3) // 4
+            return secrets.token_urlsafe(nbytes)[:length]
+        else:
+            alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            return "".join(secrets.choice(alphabet) for _ in range(length))
+
+    @classmethod
+    def hex(cls, length: int = 32) -> str:
+        return cls.random(length=length, mode="hex")
+
+    @classmethod
+    def urlsafe(cls, length: int = 32) -> str:
+        return cls.random(length=length, mode="urlsafe")
+
 
 token = TokenManager
+

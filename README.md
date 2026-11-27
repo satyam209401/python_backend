@@ -1,4 +1,126 @@
-# Python Backend API Documentation
+# 🚀 Python Backend API Framework
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Redis](https://img.shields.io/badge/Redis-Async%20Ready-DC382D.svg?logo=redis&logoColor=white)](https://redis.io/)
+[![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20Argon2id%20%7C%20Ed25519-green.svg)](https://owasp.org/)
+[![Architecture](https://img.shields.io/badge/Architecture-Modular%20%7C%20Auto--Routing-orange.svg)](#)
+
+A high-performance, modular, and enterprise-grade Python backend framework built on top of **FastAPI**, **SlowAPI**, and **Uvicorn**. Designed for rapid microservices and scalable web applications with zero-boilerplate auto-routing, built-in cryptographic security, universal database connectors, and production-ready audit logging.
+
+---
+
+## 📑 Table of Contents
+
+- [📁 Project Folder Structure & Architecture](#-project-folder-structure--architecture)
+- [1. Environment Configuration (`env`)](#1-environment-configuration-env)
+- [2. API Response Helper (`res`)](#2-api-response-helper-res)
+- [3. Request Body Limiter (`body`)](#3-request-body-limiter-body)
+- [4. Logger Utility (`log`)](#4-logger-utility-log)
+- [5. Client & User Info Utility (`user_info`)](#5-client--user-info-utility-user_info)
+- [6. Database Manager (`DB.raw`, `DB.isConnected`)](#6-database-manager-dbraw-dbisconnected)
+- [7. SQLite Web Viewer (`sqlite.view`)](#7-sqlite-web-viewer-sqliteview)
+- [8. Request Accessor (`req`)](#8-request-accessor-req)
+- [9. Security & Cryptography Utilities](#9-security--cryptography-utilities)
+  - [9.1 AES-256-GCM Encryption (`aes`)](#91-aes-256-gcm-encryption-aes)
+  - [9.2 Base64 Helper (`base`)](#92-base64-helper-base)
+  - [9.3 OWASP Password Hashing (`password`)](#93-owasp-password-hashing-password)
+  - [9.4 Stateless Encrypted Token & Unique Token Generator (`token`)](#94-stateless-encrypted-token-manager-token)
+  - [9.5 Ed25519 Digital Signature (`dsc`, `dscToken`, `dscVerify`)](#95-ed25519-digital-signature-dsc-dsctoken-dscverify)
+- [10. Anti-Exploit String Validator (`GuardString`)](#10-anti-exploit-string-validator-guardstring)
+- [11. Main API Entry Gate (`entry`)](#11-main-api-entry-gate-entry)
+- [12. Asynchronous Redis Client (`redis`)](#12-asynchronous-redis-client-redis)
+- [13. CORS Configuration (`cors`)](#13-cors-configuration-cors)
+- [14. Complete API Endpoint Guide (Step-by-Step with SlowAPI)](#14-complete-api-endpoint-guide-step-by-step-with-slowapi)
+- [🚀 How to Run the Project (Step-by-Step Guide)](#how-to-run-the-project-project-run-kaise-karein)
+
+---
+
+## 📁 Project Folder Structure & Architecture
+
+Yeh framework **Modular Architecture** follow karta hai jisme sabhi core utilities globally inject hoti hain (`builtins`), jisse endpoints me redundant imports nahi karne padte:
+
+```text
+py_backend/
+├── .env                          # Local environment variables (Git ignored)
+├── .env.example                  # Environment template file
+├── .gitignore                    # Git tracking ignore rules (.venv, .env, *.sqlite, logs)
+├── env.py                        # Centralized environment loader (builtins.env)
+├── main.py                       # Application bootstrap & ASGI Uvicorn server entry
+├── README.md                     # Comprehensive framework & API documentation
+├── requirements.txt              # Project dependencies manifest
+│
+├── App/                          # Core Framework Engine & Global Registrations
+│   ├── app.py                    # FastAPI setup, middleware stack, lifespan & builtins injection
+│   ├── entry.py                  # Global /api entry gate router & middleware proxy
+│   │
+│   ├── database/                 # Database Drivers & Connection Pools
+│   │   ├── redis.py              # Asynchronous Redis client with auto JSON serialization
+│   │   ├── sql.py                # Multi-engine SQL manager (SQLite, MySQL, PostgreSQL)
+│   │   └── sqlite_web.py         # Built-in SQLite web management viewer
+│   │
+│   ├── exception_handler/        # Centralized Exception Interceptors
+│   │   ├── __init__.py           # Exception handler registry
+│   │   ├── http.py               # Custom HTTP status error formatting
+│   │   ├── rate_limit.py         # SlowAPI 429 Too Many Requests interceptor
+│   │   ├── server.py             # Global 500 unhandled exception & AuditLogger trigger
+│   │   └── validation.py         # Pydantic & request payload validation handler
+│   │
+│   ├── security/                 # Cryptography & Protection Modules
+│   │   ├── cors.py               # Dynamic CORS policy builder
+│   │   ├── password.py           # OWASP-compliant Argon2id password hasher
+│   │   ├── token.py              # Stateless encrypted token & CSPRNG token generator
+│   │   │
+│   │   ├── aes/                  # AES-256-GCM Authenticated Encryption
+│   │   │   ├── enc.py            # Payload encryption with dynamic IV
+│   │   │   └── dec.py            # Authenticated decryption with tag verification
+│   │   │
+│   │   └── base64/               # URL-safe & Standard Base64 Encoding
+│   │       ├── enc.py            # Base64 encoder
+│   │       └── des.py            # Base64 decoder
+│   │
+│   └── src/                      # Internal Services, Utilities & Helpers
+│       ├── router.py             # AutoRouter: File-based dynamic route discovery engine
+│       │
+│       ├── cleaner/              # System Cache Maintenance
+│       │   └── clear_pycache.py  # Automatic __pycache__ cleanup on application boot
+│       │
+│       ├── dsc/                  # Asymmetric Digital Signatures
+│       │   └── dsc.py            # Ed25519 high-speed keypair signer & verifier
+│       │
+│       ├── utils/                # Injected Global Utilities
+│       │   ├── audit_logger.py   # High-throughput SQLite runtime performance logger
+│       │   ├── body.py           # Request body size limiter decorator (@body.limit)
+│       │   ├── log.py            # Daily structured JSON file logger
+│       │   ├── req.py            # Request accessor (headers, client IP, params)
+│       │   ├── response.py       # Standardized API response builder (res.s, res.e)
+│       │   └── user_info.py      # Client IP, device, OS & browser metadata extractor
+│       │
+│       └── Validator/            # Input Sanitization
+│           └── str.py            # Anti-exploit GuardString string validator
+│
+├── db/                           # Local SQLite Storage Directory (Git ignored)
+│   ├── audit_logs.sqlite         # Permanent API request & execution audit records
+│   └── runtime_time_log.sqlite   # Endpoint latency & runtime benchmark logs
+│
+├── logs/                         # Application Log Storage (Git ignored)
+│   ├── app.log                   # Standard application output log
+│   └── 27-11-2026.json           # Daily rotation JSON log files
+│
+└── routes/                       # Application API Endpoints (Auto-Discovered)
+    └── user/
+        └── register.py           # Example user registration endpoint with SlowAPI
+```
+
+### 🌟 Core Architectural Highlights
+
+| Feature | Description |
+| :--- | :--- |
+| **Global Builtins Injection** | `env`, `res`, `req`, `log`, `body`, `user_info`, `token`, `limiter`, `DB`, `redis` pure application me bina kisi import ke directly accessible hain. |
+| **Zero-Config AutoRouter** | `routes/` directory me koi bhi `.py` file add karein, wo automatically `/api/...` prefix ke saath mount ho jati hai. `main.py` ko touch karne ki jarurat nahi. |
+| **Enterprise Cryptography** | AES-256-GCM, Argon2id, Ed25519 digital signatures, aur CSPRNG unique token generation out-of-the-box integrated hai. |
+| **High-Throughput Audit Logging** | Har incoming request ka execution time, status code, IP, aur endpoint asynchronous SQLite database me log hota hai. |
+| **Centralized Error Handling** | Standardized JSON output across 400, 401, 404, 422, 429, aur 500 status codes. |
 
 ---
 
@@ -611,6 +733,31 @@ user_data = result["data"]  # {"user_id": 101, "role": "admin"}
 user_id = user_data["user_id"]
 ```
 
+#### Random Unique Token Generator (32 / 64 Characters)
+
+OS-level CSPRNG (`secrets` module) ka use karke 100% collision-free, globally unique opaque tokens generate karne ke liye:
+
+```python
+# 1. Direct Call (Sabse aasan tarika: 32 ya 64 characters)
+t32 = token(32)             # e.g. "395ebe23cdb5504f11feba95fd31f6ac" (32 chars)
+t64 = token(64)             # e.g. "388b95de0f7ff9210da984f1eb88e5f0..." (64 chars)
+
+# 2. .random() Method (Hex, URL-safe ya Alphanumeric)
+token_32 = token.random(32)           # Default Hex format (32 chars)
+token_64 = token.random(64)           # Default Hex format (64 chars)
+
+# 3. .hex() Shortcuts
+hex_32 = token.hex(32)
+hex_64 = token.hex(64)
+
+# 4. URL-Safe Format (Verification Links, Password Reset, API Keys ke liye best)
+url_32 = token.urlsafe(32)            # "bGyBIBjQMALMZ7uSSMw0fEkfj3jdQQJM" (32 chars)
+url_64 = token.urlsafe(64)            # 64 chars URL-safe (A-Za-z0-9-_)
+
+# 5. Alphanumeric Only (Bina special character ke)
+clean_32 = token.random(32, mode="alphanumeric")
+```
+
 ---
 
 ### 9.5 Ed25519 Digital Signature (`dsc`, `dscToken`, `dscVerify`)
@@ -1173,11 +1320,3 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 | **Interactive Docs (Swagger)** | `http://127.0.0.1:8000/docs` | Swagger UI (`DOCS=true` hone par) |
 | **Alternative Docs (ReDoc)** | `http://127.0.0.1:8000/redoc` | ReDoc API documentation |
 | **Database Web Admin** | `http://127.0.0.1:8000/db` | SQLite web database viewer |
-
-
-
-
-
-
-
-
