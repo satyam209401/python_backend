@@ -999,11 +999,6 @@ Create or edit your route file in `routes/auth.py`:
 
 ```python
 from fastapi import APIRouter, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
-# Standard Official SlowAPI Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
 
 # Create FastAPI Router
 router = APIRouter()
@@ -1095,18 +1090,90 @@ async def auth_register(request: Request):
 
 ### 3. How Rate Limiting Works (`slowapi`)
 
-- **Limiter Definition:** `limiter = Limiter(key_func=get_remote_address)` extracts the client's real IP address.
-- **Decorator:** `@limiter.limit("5/minute")` or `@limiter.limit("100/hour")` restricts requests.
-- **Request Parameter Requirement:** SlowAPI requires `request: Request` to be declared as an argument in the endpoint function so it can read the client IP address and headers.
-- **Automatic 429 Response:** When a client exceeds the allowed limit, the application's global exception handler automatically intercepts `RateLimitExceeded` and returns HTTP 429:
+SlowAPI rate limiting pure project me centralized config ke sath use hoti hai:
+
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Standard Official SlowAPI Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+```
+
+- **Builtin Availability:** `limiter` instance project ke `builtins` me globally registered hai, isliye kisi bhi route file me bina alag se import kiye direct `@limiter.limit(...)` decorator use kiya ja sakta hai.
+- **Decorator Usage:** `@limiter.limit("3/minute")` ya `@limiter.limit("100/hour")` lagakar IP-based rate limiting enforce hoti hai.
+- **Request Parameter Requirement:** SlowAPI ke decorator ko client IP extract karne ke liye endpoint function me `request: Request` parameter ka hona compulsory hai (`async def endpoint_name(request: Request):`).
+- **Professional 429 Response:** Jab koi client limit exceed karta hai, toh centralized exception handler automatically HTTP 429 response return karta hai:
   ```json
   {
     "status": false,
     "status_code": 429,
-    "message": "Rate limit exceeded",
+    "message": "Too many requests. You have exceeded your rate limit. Please try again later.",
     "data": []
   }
   ```
+
+---
+
+## How to Run the Project (Project Run Kaise Karein)
+
+### Step 1: Environment Setup (.env)
+Project root par `.env` file verify karein. Agar `.env` nahi hai toh `.env.example` se copy karein:
+```bash
+# Windows (PowerShell)
+Copy-Item .env.example .env
+
+# Linux / macOS
+cp .env.example .env
+```
+
+### Step 2: Virtual Environment Activate Karein
+```bash
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# Windows (Command Prompt)
+.\.venv\Scripts\activate.bat
+
+# Linux / macOS
+source .venv/bin/activate
+```
+
+### Step 3: Dependencies Install Karein (First Time Setup)
+```bash
+pip install -r requirements.txt
+```
+
+### Step 4: Server Run Karein
+Aap server ko do tarike se run kar sakte hain:
+
+#### Option A: Direct Python (Recommended)
+```bash
+python main.py
+```
+Isme automatically:
+- `.env` configurations load hongi.
+- Uvicorn server `127.0.0.1:8000` par start ho jayega.
+- Auto-reload enable rahega (`APP_RELOAD=true`).
+- Startup par automatically `__pycache__` clean hoga.
+
+#### Option B: Direct Uvicorn
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+---
+
+### Important URLs & Endpoints
+
+| Resource | URL | Description |
+| :--- | :--- | :--- |
+| **Root Health Probe** | `http://127.0.0.1:8000/` | Base server running probe |
+| **API Entry Gateway** | `http://127.0.0.1:8000/api` | Centralized API entry gate |
+| **Interactive Docs (Swagger)** | `http://127.0.0.1:8000/docs` | Swagger UI (`DOCS=true` hone par) |
+| **Alternative Docs (ReDoc)** | `http://127.0.0.1:8000/redoc` | ReDoc API documentation |
+| **Database Web Admin** | `http://127.0.0.1:8000/db` | SQLite web database viewer |
+
 
 
 

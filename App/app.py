@@ -1,3 +1,4 @@
+import asyncio
 import builtins
 import os
 import sys
@@ -140,6 +141,11 @@ builtins.AuditAppException = AuditAppException
 async def lifespan(app: FastAPI):
     # App startup / reload par automatically cache clean karein
     clear_pycache()
+    # Redis start / connect
+    try:
+        await redis.connect()
+    except Exception as e:
+        log(f"Redis connect error: {e}")
     yield
     # App shutdown cleanup
     await redis.close()
