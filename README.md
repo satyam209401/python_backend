@@ -1,749 +1,1116 @@
-<div align="center">
-
-# ⚡ FastAPI Enterprise Backend Architecture
-
-**A modular, high-performance, and military-grade secure asynchronous backend framework for Python.**
-
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Cryptography](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20Argon2id-red.svg?style=for-the-badge&logo=securityscorecard&logoColor=white)](https://cryptography.io)
-[![Databases](https://img.shields.io/badge/Databases-MySQL%20%7C%20SQLite%20%7C%20Redis-orange.svg?style=for-the-badge&logo=mysql&logoColor=white)](https://redis.io)
-[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
+# Python Backend API Documentation
 
 ---
 
-[Key Features](#-key-features) • [Project Structure](#-project-structure) • [Installation & Setup](#-installation--setup) • [Core Utilities](#-core-utilities) • [Security & Cryptography](#-security--cryptography) • [Database Drivers](#-database-drivers) • [API Documentation](#-api-documentation)
+## 1. Environment Configuration (`env`)
+
+The project uses `env.py` and a globally registered `env()` helper function to manage environment variables from `.env`.
+
+### Key Features
+- **Global Availability:** Directly use `env("KEY")` anywhere in the project without importing `os` or `env`.
+- **Custom Path Support:** Configure the `.env` location via `env.py` (e.g. for server or local environment).
+- **Load Status Inspection (`env.is_loaded`):** Boolean flag indicating whether the `.env` file exists and was loaded successfully.
+- **Bytecode Control:** Prevent Python from generating `__pycache__` directories by toggling an environment setting.
 
 ---
 
-</div>
+### Configuration (`env.py`)
 
-## 📌 Overview
+File: `env.py`
 
-This repository provides an enterprise-ready, production-hardened foundation for modern APIs. It eliminates repetitive boilerplate by providing **Zero-Import Global Injections**, military-grade authenticated encryption (**AES-256-GCM**), stateless yet revokable encrypted session tokens (**TokenManager**), OWASP-compliant password hashing (**Argon2id**), anti-exploit Unicode & homoglyph sanitization (**GuardString**), asymmetric digital signatures (**Ed25519 DSC**), and native multi-database connectors (**MySQL, SQLite, Redis**).
-
----
-
-## 🚀 Key Features
-
-* **⚡ Modern Asynchronous Core:** Built on top of **FastAPI**, **Starlette**, and **Uvicorn** with automatic OpenAPI (Swagger UI) and ReDoc generation.
-* **📁 Scalable Versioned Routing:** Clean directory-based version routing (`/v1` and `/v2`) for seamless API evolution.
-* **🌐 Zero-Import Global Injections (`builtins`):** High-frequency utilities are globally accessible across all files without importing:
-  * `res` — Standardized API response builder (`res.s()` for success, `res.e()` for errors).
-  * `env` — Resilient environment variable loader with production path detection.
-  * `req` — Universal request accessor (`req.b()` body, `req.h()` headers, `req.q()` query params).
-  * `token` — Military-grade encrypted JWT alternative with device and IP fingerprint binding.
-  * `password` — Argon2id OWASP password hashing and constant-time verification.
-  * `GuardString` — Anti-exploit string sanitizer protecting against control codes and homoglyphs.
-  * `aes` — Authenticated AES-256-GCM encryption with HKDF key derivation.
-  * `dsc` / `dscToken` / `dscVerify` — Ed25519 asymmetric cryptographic signing and verification.
-  * `base` — Fast Base64 encoder and decoder with native JSON object support.
-  * `body` — Request payload size limiter protecting endpoints against Memory DoS (`@body.limit("2MB")`).
-  * `user_info` — Cloudflare-aware Client IP, OS, Browser, and Device detection.
-  * `redis` — Asynchronous Redis client with auto JSON handling and connection lifecycle management.
-  * `sqlite` — Thread-safe asynchronous SQLite driver running in high-speed WAL mode.
-  * `DB` / `MySQLDB` — Multi-database MySQL manager with connection pooling and transactions.
-  * `pg` — Multi-database PostgreSQL manager with connection pooling and transactions.
-* **🛡️ Hardened Network Security:** Configurable CORS middleware with dynamic origins and header controls via `.env`.
-
----
-
-## 📂 Project Structure
-
-```text
-py_backend/
-├── App/
-│   ├── app.py                  # Global bootstrap & builtins registration
-│   ├── database/               # Database connectors & connection managers
-│   │   ├── mysql.py            # MySQL manager & transaction runner (MySQLDB, DB)
-│   │   ├── pg.py               # PostgreSQL manager & transaction runner (pg)
-│   │   ├── redis.py            # Async Redis manager with multi-db support (redis)
-│   │   └── sqlite.py           # Async SQLite manager with WAL mode (sqlite)
-│   ├── exception_handler/      # Centralized modular exception handlers
-│   │   ├── http.py             # HTTP status exceptions
-│   │   ├── rate_limit.py       # SlowAPI rate limit handlers
-│   │   ├── server.py           # Internal 500 server crash concealment
-│   │   └── validation.py       # Pydantic & request validation errors
-│   ├── security/               # Cryptographic primitives & security utilities
-│   │   ├── aes/                # Authenticated AES-256-GCM (enc.py, dec.py)
-│   │   ├── base64/             # Base64 encoder & decoder (enc.py, des.py)
-│   │   ├── password.py         # Argon2id password hashing (Password: hash, verify)
-│   │   └── token.py            # Encrypted Token Manager (TokenManager, token)
-│   └── src/
-│       ├── Validator/
-│       │   └── str.py          # Anti-exploit string validator (GuardString)
-│       ├── dsc/
-│       │   └── dsc.py          # Ed25519 digital signatures (dscToken, dsc, dscVerify)
-│       └── utils/
-│           ├── body.py         # Request payload size limiter (body.limit)
-│           ├── log.py          # Auto-caller file routing logger (log)
-│           ├── req.py          # Context-aware request helper (b, h, q)
-│           ├── response.py     # Unified JSON response builder (Response: s, e)
-│           └── user_info.py    # Client device & IP detector (user_info)
-├── routes/
-│   ├── v1/                     # Version 1 API Endpoints
-│   │   ├── admin/              # Administrative endpoints (dashboard, payment, user)
-│   │   ├── auth/               # Authentication endpoints (login, register)
-│   │   └── booking/            # Booking endpoints (plot)
-│   └── v2/                     # Version 2 API Endpoints (extensible)
-├── .env.example                # Sample environment configuration template
-├── env.py                      # Multi-environment detection & loader
-├── main.py                     # Application entry point & FastAPI instance
-├── requirements.txt            # Python dependencies
-└── README.md                   # Project documentation
-```
-
----
-
-## 🛠️ Installation & Setup
-
-### 1. Clone the Repository & Navigate
-Clone the codebase from GitHub and enter the project directory:
-```bash
-# Clone the repository
-git clone https://github.com/satyam209401/python_backend.git
-
-# Navigate into the project folder (Crucial Step!)
-cd python_backend
-```
-
-### 2. Set Up Virtual Environment
-Create and activate an isolated Python virtual environment:
-
-#### Windows (PowerShell):
-```powershell
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-.\venv\Scripts\Activate.ps1
-```
-> **Tip:** If PowerShell gives a script execution policy error, run:
-> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process`
-
-#### Windows (Command Prompt - CMD):
-```cmd
-python -m venv venv
-.\venv\Scripts\activate.bat
-```
-
-#### Linux / macOS (Bash / Zsh):
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-Ensure `pip` is up to date, then install all required packages:
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment Variables (`.env`)
-Copy `.env.example` to create your active `.env` configuration file:
-
-#### Windows (PowerShell):
-```powershell
-Copy-Item .env.example .env
-# or
-cp .env.example .env
-```
-
-#### Windows (CMD):
-```cmd
-copy .env.example .env
-```
-
-#### Linux / macOS:
-```bash
-cp .env.example .env
-```
-
-#### Accessing Environment Variables in Code:
-`env` is globally accessible anywhere without importing:
 ```python
-port = env("PORT", "8000")
-secret_key = env("SECRET_KEY")
-```
-
-### 5. Run the Application
-
-#### Development Mode (Auto-Reload):
-Always use `python -m uvicorn` to guarantee the virtual environment's binary is executed cleanly:
-```bash
-python -m uvicorn main:app --reload
-```
-The API server will start at: `http://127.0.0.1:8000`
-* **Swagger UI Documentation:** `http://127.0.0.1:8000/docs`
-* **ReDoc Documentation:** `http://127.0.0.1:8000/redoc`
-
-#### Production Mode:
-```bash
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+# Set the explicit path to your .env file
+ENV_PATH = Path("/www/wwwroot/private/.env")  # Server deployment
+# Local development: ENV_PATH = Path(".env")
 ```
 
 ---
 
-### 💡 Common Setup Troubleshooting
+### `.env` File Setup
 
-| Issue / Error | Cause | Solution |
+Create a `.env` file in the configured location:
+
+```env
+APP_NAME=Python Backend API
+APP_VERSION=1.0.0
+APP_ENV=development
+DEBUG=true
+HOST=127.0.0.1
+PORT=8000
+APP_RELOAD=false
+
+
+# Disable Python bytecode (__pycache__) generation
+DONT_WRITE_BYTECODE=true
+```
+
+---
+
+### Usage in Code
+
+#### 1. Retrieve a Value
+```python
+# Available globally across all modules (no import needed):
+app_name = env("APP_NAME")
+port = env("PORT")
+```
+
+#### 2. Retrieve with a Default Fallback Value
+If the requested key does not exist in `.env`, the fallback value is returned:
+```python
+# Returns 8000 if PORT is not found
+port = env("PORT", 8000)
+
+# Returns False if DEBUG is not found
+debug_mode = env("DEBUG", False)
+```
+
+#### 3. Verify If `.env` Is Loaded (`env.is_loaded`)
+```python
+if not env.is_loaded:
+    print("Warning: .env file is not loaded!")
+```
+
+---
+
+## 2. API Response Helper (`res`)
+
+The `res` helper standardizes all API JSON responses across FastAPI endpoints, ensuring uniform response structures and automatic security headers.
+
+### Key Features
+- **Global Availability:** Registered in `builtins.res`, so `res.s()` and `res.e()` are available everywhere without imports.
+- **Automatic Security Headers:** Every response automatically includes:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+- **Predictable JSON Structure:** The frontend client always receives a consistent format:
+  ```json
+  {
+    "status": true,
+    "status_code": 200,
+    "message": "Response message",
+    "data": []
+  }
+  ```
+- **Smart Token Wrapping:** Passing a plain token string to `data` automatically formats it as `{"token": "<token_string>"}`.
+
+---
+
+### Response Methods
+
+#### 1. Success Response: `res.s()`
+Use `res.s(message=False, data=None, code=200)` to return a successful response:
+
+```python
+# 1. Simple success message
+return res.s("Operation completed successfully")
+
+# 2. Return data dictionary or list
+return res.s("User profile retrieved", {"id": 101, "name": "Rahul"})
+
+# 3. Return a token string (automatically wrapped as {"token": "..."})
+return res.s("Login successful", "FpzucUOkqbwzIT9BXQqtQLBwJoUyG")
+# Output JSON data field: {"token": "FpzucUOkqbwzIT9BXQqtQLBwJoUyG"}
+
+# 4. Custom status code (e.g. 201 Created)
+return res.s("User registered successfully", {"id": 102}, 201)
+```
+
+---
+
+#### 2. Error Response: `res.e()`
+Use `res.e(message="error", code=400, data=None)` to return an error response:
+
+```python
+# 1. 400 Bad Request
+return res.e("Invalid request parameter")
+
+# 2. 401 Unauthorized
+return res.e("Invalid or expired session token", 401)
+
+# 3. 404 Not Found
+return res.e("User record not found", 404)
+
+# 4. 422 Validation Error with detailed error list
+return res.e("Validation failed", 422, errors_list)
+
+# 5. 500 Internal Server Error
+return res.e("Database operation failed", 500)
+```
+
+---
+
+## 3. Request Body Limiter (`body`)
+
+The `body` utility provides endpoint-level protection against oversized payload attacks and Denial of Service (DoS) by enforcing maximum request body limits.
+
+### Key Features
+- **Global Availability:** Accessible globally as `@body.limit(...)` or explicitly via `from App.src.utils.body import body`.
+- **Dual-Layer Protection:**
+  1. **Header Inspection:** Rejects oversized requests immediately using `Content-Length` before consuming server memory.
+  2. **Raw Byte Verification:** Enforces payload limits even if `Content-Length` is missing or spoofed.
+- **Flexible Units:** Supports `B`, `KB`, `MB`, and `GB` (case-insensitive, e.g. `"500KB"`, `"2MB"`, `"10MB"`).
+- **HTTP 413 Handling:** Automatically raises `HTTP 413 Request payload too large` when the threshold is exceeded.
+
+---
+
+### Usage in Code
+
+Apply the `@body.limit()` decorator directly above any FastAPI route handler:
+
+```python
+from fastapi import Request
+
+# 1. Limit JSON payload to 2MB (Global access)
+@app.post("/api/update-profile")
+@body.limit("2MB")
+async def update_profile(request: Request):
+    return res.s("Profile updated successfully")
+
+# 2. Limit small payloads (e.g. 100KB for auth endpoints)
+@app.post("/api/login")
+@body.limit("100KB")
+async def login(request: Request):
+    return res.s("Logged in successfully")
+
+# 3. Explicit import (if preferred)
+from App.src.utils.body import body
+
+@app.post("/api/upload")
+@body.limit("10MB")
+async def upload_file(request: Request):
+    return res.s("File received")
+```
+
+---
+
+### Supported Size Units
+
+| Unit | Example | Description |
 | :--- | :--- | :--- |
-| `'uvicorn' is not recognized` | Virtual environment is not activated or `requirements.txt` was not installed. | Activate `venv` and run `pip install -r requirements.txt`, then run with `python -m uvicorn main:app --reload`. |
-| `Cannot find path '.env.example'` | Terminal is not inside the project directory. | Run `cd python_backend` first, ensure `ls` or `dir` shows `.env.example`, then copy. |
-| `PSSecurityException / Script Execution` | PowerShell restricts unsigned script execution. | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process` in PowerShell. |
+| `B` | `"1024B"` | Bytes |
+| `KB` | `"500KB"` | Kilobytes (1024 Bytes) |
+| `MB` | `"2MB"` | Megabytes (1024 x 1024 Bytes) |
+| `GB` | `"1GB"` | Gigabytes (1024 x 1024 x 1024 Bytes) |
+
+**Note:** The decorator works with both synchronous and asynchronous endpoints. The size is validated before the endpoint function executes.
 
 ---
 
-## 🌐 Core Utilities
+## 4. Logger Utility (`log`)
 
-### 1. Standard Response Builder (`res`)
-Ensures uniform API responses across the entire application:
+The `log` utility provides structured, automatic file logging with timestamps, source file detection, and formatting for dictionaries, lists, and exception tracebacks.
 
-#### Success Response:
+### Key Features
+- **Global Availability:** Registered in `builtins.log`, so `log(...)` can be called from any file without imports.
+- **Automatic Caller Detection:** Automatically detects which file triggered the log (e.g. `[ 2026-11-27 11:57:00 ] [ login.py ]`).
+- **File Output:** Saves logs into the `logs/` directory named after the calling file (e.g. `logs/login.log`, `logs/app.log`), creating folders automatically.
+- **Smart Data Formatting:**
+  - Strings: Logged cleanly as single-line or multi-line blocks.
+  - Dictionaries / Lists: Automatically formatted as pretty-printed JSON (`indent=2`).
+  - Exceptions: Automatically formats the full stack trace (`traceback.format_exception`).
+
+---
+
+### Usage in Code
+
 ```python
-return res.s("User fetched successfully", {"user_id": 101, "name": "Rahul"})
+# 1. Simple text log
+log("Application server started successfully")
+
+# 2. Dictionary / JSON data logging (pretty-printed automatically)
+user_data = {"user_id": 101, "email": "user@example.com", "role": "admin"}
+log(user_data)
+
+# 3. Exception / Error logging with full stack trace
+try:
+    result = 10 / 0
+except Exception as exc:
+    log(exc)
+
+# 4. Custom log file path (optional)
+log("Custom event log", path="logs/custom_audit.log")
 ```
+
+---
+
+## 5. Client & User Info Utility (`user_info`)
+
+The `user_info` utility extracts client request metadata, including real IP addresses (with proxy and Cloudflare support), browser, operating system, and device type.
+
+### Key Features
+- **Global Availability:** Registered in `builtins.user_info`, directly accessible across endpoints.
+- **Real IP Detection:** Resolves the client's true IP address, respecting trusted local reverse proxies (`127.0.0.1`, `::1`) and Cloudflare headers (`cf-connecting-ip`).
+- **Device & Browser Detection:** Automatically parses user-agent strings into clean identifiers:
+  - **Browsers:** Chrome, Firefox, Safari, Edge, Opera
+  - **Operating Systems:** Windows, Android, iOS, macOS, Linux
+  - **Devices:** Mobile, Tablet, Desktop
+
+---
+
+### Usage in Code
+
+```python
+from fastapi import Request
+
+@app.get("/api/client-info")
+async def get_client_info(request: Request):
+    # 1. Get client IP address
+    ip = user_info.ip(request)
+
+    # 2. Get detected browser name
+    browser = user_info.browser()
+
+    # 3. Get detected operating system
+    os_name = user_info.os()
+
+    # 4. Get device category (Mobile, Tablet, Desktop)
+    device = user_info.device()
+
+    # 5. Get complete client metadata dictionary
+    client_data = user_info.info()
+    
+    return res.s("Client info retrieved", client_data)
+```
+
+#### Example Output (`user_info.info()`):
+```json
+{
+  "ip": "203.0.113.195",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
+  "browser": "Chrome",
+  "os": "Windows",
+  "device": "Desktop",
+  "platform": "\"Windows\"",
+  "model": "",
+  "mobile": "?0",
+  "language": "en-US,en;q=0.9",
+  "referer": null
+}
+```
+
+---
+
+## 6. Database Manager (`DB.raw`, `DB.isConnected`)
+
+The `DB` utility in `App/database/sql.py` provides a unified, production-ready interface to run SQL queries (`DB.raw`) and verify connection health (`DB.isConnected`) across **SQLite**, **MySQL**, and **PostgreSQL** without changing your query logic.
+
+### Supported Database Engines & Use Cases
+
+| Database | Driver Name | Best Use Case | Key Features |
+| :--- | :--- | :--- | :--- |
+| **SQLite** | `"sqlite"` | Local development, single-server apps, microservices, local audit logs, zero-setup portability. | Auto-configured high-performance PRAGMAs (`WAL` journal mode, `64KB` page size, `64MB` cache, `2GB` mmap, foreign keys, busy timeout `5000ms`). |
+| **MySQL / MariaDB** | `"mysql"` | High-traffic web apps, eCommerce, relational systems with high concurrent writes. | DictCursor support, utf8mb4 encoding, connection timeouts, autocommit. |
+| **PostgreSQL** | `"pg"` / `"postgres"` | Enterprise systems, complex analytical queries, JSON/JSONB payloads, financial and strict ACID compliance. | DictRow row-factory, SSL mode support, parameterized colon syntax. |
+
+---
+
+### Configuration Setup (`.env`)
+
+You can store database connection configurations as JSON strings in `.env` or pass configuration dictionaries directly in Python:
+
+```env
+# 1. SQLite Configuration
+DB_SQLITE='{"DRIVER": "sqlite", "path": "db/audit_logs.sqlite"}'
+
+# 2. MySQL Configuration
+DB_MYSQL='{"DRIVER": "mysql", "DB_HOST": "127.0.0.1", "DB_PORT": 3306, "DB_NAME": "app_db", "DB_USER": "root", "DB_PASS": "secret", "DB_CHARSET": "utf8mb4"}'
+
+# 3. PostgreSQL Configuration
+DB_POSTGRES='{"DRIVER": "pg", "DB_HOST": "127.0.0.1", "DB_PORT": 5432, "DB_NAME": "app_pg_db", "DB_USER": "postgres", "DB_PASS": "secret", "DB_SSLMODE": "prefer"}'
+```
+
+---
+
+### Usage in Code
+
+#### 1. SQLite Use Case
+Use SQLite when you need local, high-speed, zero-maintenance storage without running external database services:
+
+```python
+from App.database.sql import DB
+
+# Select query (returns list of dictionaries):
+users = DB.raw("DB_SQLITE", "SELECT * FROM users WHERE status = ? LIMIT 10", ["active"])
+
+# Insert query (returns affected row count):
+affected = DB.raw(
+    "DB_SQLITE",
+    "INSERT INTO users (name, email) VALUES (?, ?)",
+    ["Rahul Sharma", "rahul@example.com"]
+)
+
+# In-memory SQLite for testing:
+test_db = {"DRIVER": "sqlite", "path": ":memory:"}
+DB.raw(test_db, "CREATE TABLE temp (id INTEGER PRIMARY KEY, val TEXT)")
+```
+
+#### 2. MySQL / MariaDB Use Case
+Use MySQL for relational data requiring high concurrency and web-scale performance:
+
+```python
+from App.database.sql import DB
+
+# Using named parameters with colon syntax (:email):
+user = DB.raw(
+    "DB_MYSQL",
+    "SELECT id, name, email FROM users WHERE email = :email",
+    {"email": "rahul@example.com"}
+)
+
+# Update query:
+updated_rows = DB.raw(
+    "DB_MYSQL",
+    "UPDATE users SET status = :status WHERE id = :user_id",
+    {"status": "verified", "user_id": 101}
+)
+```
+
+#### 3. PostgreSQL Use Case
+Use PostgreSQL for enterprise architectures, complex joins, JSON querying, and transactional rigor:
+
+```python
+from App.database.sql import DB
+
+# Complex query with colon parameters:
+orders = DB.raw(
+    "DB_POSTGRES",
+    "SELECT id, total_amount, status FROM orders WHERE status = :status ORDER BY created_at DESC LIMIT 20",
+    {"status": "completed"}
+)
+
+# Querying native JSON / JSONB columns:
+device_logs = DB.raw(
+    "DB_POSTGRES",
+    "SELECT id, payload->>'browser' AS browser FROM audit_logs WHERE payload->>'user_id' = :uid",
+    {"uid": "101"}
+)
+```
+
+#### 4. Connection Health Check (`DB.isConnected`)
+Verify database connectivity before running operations or during startup health checks (returns boolean `True` or `False`):
+
+```python
+from App.database.sql import DB  # or use global builtins: DB / db
+
+# 1. Check MySQL connection:
+if DB.isConnected(env("mysql")):
+    print("MySQL connected")
+
+# 2. Check PostgreSQL connection (env key name or config string):
+ok_pg = DB.isConnected(env("pg"))
+
+# 3. Check SQLite connection with dict or env key name:
+ok_sqlite = DB.isConnected({"DRIVER": "sqlite", "path": "./data/app.db"})
+if ok_sqlite:
+    print("SQLite ready")
+```
+
+---
+
+## 7. SQLite Web Viewer (`sqlite.view`)
+
+An in-browser Adminer-style graphical management interface for SQLite databases.
+
+### Key Features
+- **Browse & Search:** Fast paginated data view (strict 100 rows per page limit).
+- **CRUD Operations:** Insert, Edit, and Delete records with single confirmation alerts.
+- **Table Schema & Indexing (phpMyAdmin style):**
+  - Add / Drop / Change columns.
+  - Set `UNIQUE` or `INDEX` directly from the structure table or column creation forms.
+  - View all table indexes with a 1-click `Drop` action.
+- **SQL Console:** Execute custom SQL commands with timing and row count metrics.
+- **CSV Export:** 1-click export of table data to CSV.
+
+### Endpoint Mount Example
+
+```python
+from fastapi import FastAPI
+import App.app
+
+app = FastAPI(lifespan=App.app.lifespan)
+App.app.init(app)
+
+@app.get("/db")
+async def view_database():
+    # Renders the full Adminer SQLite web UI for the given database file:
+    return sqlite.view(env("audit_logs"))
+```
+
+---
+
+## 8. Request Accessor (`req`)
+
+The `req` utility provides an asynchronous, context-aware interface for extracting request body data, HTTP headers, and URL query parameters with built-in memory caching.
+
+### Key Features
+- **Global Availability:** Accessible globally via `req` without explicit imports.
+- **Context-Aware:** Automatically detects the current request context or accepts an explicit `Request` object.
+- **Auto Body Detection:** Automatically parses JSON, URL-encoded forms, multipart forms, or raw text based on `Content-Type`.
+- **Request State Caching:** Caches parsed body data on `request.state._cached_body_data` to eliminate redundant parsing across middlewares and handlers.
+
+---
+
+### Usage in Code
+
+```python
+from fastapi import FastAPI, Request
+
+@app.post("/api/user/update")
+async def update_user(request: Request):
+    # 1. Retrieve the entire parsed body dictionary
+    data = await req.b()
+
+    # 2. Retrieve a specific body parameter with default fallback
+    name = await req.b("name", default="Anonymous")
+    email = await req.b("email")
+
+    # 3. Retrieve request header
+    auth_header = await req.h("authorization")
+    api_key = await req.h("x-api-key")
+
+    # 4. Retrieve query parameters (?page=1&limit=20)
+    page = await req.q("page", default="1")
+    limit = await req.q("limit", default="20")
+
+    return res.s("Data retrieved successfully", {"name": name, "email": email, "page": page})
+```
+
+---
+
+## 9. Security & Cryptography Utilities
+
+High-security, production-hardened cryptographic utilities globally available across the application.
+
+---
+
+### 9.1 AES-256-GCM Encryption (`aes`)
+
+Provides military-grade authenticated symmetric encryption using **AES-256-GCM** with HKDF SHA-256 key derivation and fresh 12-byte random nonces per operation.
+
+#### Key Features
+- **Global Availability:** Registered in `builtins.aes`.
+- **Zero Configuration:** Automatically derives a 256-bit cryptographically strong key via HKDF from any secret passphrase or byte sequence.
+- **Integrity Protection:** Embeds AEAD authentication tag to detect any tampering or bit-flipping attacks.
+- **Direct Object Support:** Automatically serializes dictionaries, lists, strings, and integers to JSON before encryption.
+
+#### Usage Example
+
+```python
+# Secret key (can be any passphrase or from env)
+secret_key = env("ENCRYPTION_KEY", "super-secret-passphrase-32-bytes-long")
+
+# 1. Encrypt a dictionary or sensitive payload
+sensitive_data = {"user_id": 101, "card_token": "tok_9918237"}
+encrypted_token = aes.e(sensitive_data, secret_key)
+# Output: Base64 string containing [12-byte IV + Ciphertext + 16-byte Tag]
+
+# 2. Decrypt back to a dictionary (as_json=True)
+decrypted_data = aes.d(encrypted_token, secret_key, as_json=True)
+print(decrypted_data["card_token"])  # tok_9918237
+
+# 3. Decrypt plain text (as_json=False)
+plain_text = aes.d(encrypted_token, secret_key)
+```
+
+---
+
+### 9.2 Base64 Helper (`base`)
+
+A fast Base64 encoding and decoding utility with automatic JSON serialization and UTF-8 handling.
+
+#### Key Features
+- **Global Availability:** Registered in `builtins.base`.
+- **Native Data Support:** Encodes dictionaries, lists, strings, and raw bytes directly without manual JSON conversion.
+
+#### Usage Example
+
+```python
+# 1. Encode dictionary or string to Base64
+payload = {"status": "active", "tier": "gold"}
+encoded = base.e(payload)
+
+# 2. Decode Base64 string back to JSON dictionary
+decoded_dict = base.d(encoded, as_json=True)
+
+# 3. Decode plain string
+text_encoded = base.e("Hello World")
+decoded_str = base.d(text_encoded)
+```
+
+---
+
+### 9.3 OWASP Password Hashing (`password`)
+
+Secure password hashing and verification using the **Argon2id** algorithm (RFC 9106), optimized to resist GPU/ASIC brute-force and side-channel attacks.
+
+#### Key Features
+- **Global Availability:** Registered in `builtins.password`.
+- **OWASP Recommended Parameters:** `memory_cost=65536` (64 MiB), `time_cost=4`, `parallelism=1`.
+- **DoS Protection:** Enforces a 4096-byte limit on passwords to prevent CPU exhaustion.
+- **Constant-Time Verification:** Protects against timing side-channel attacks.
+
+#### Usage Example
+
+```python
+# 1. Hash a user password during registration
+user_password = "UserSecurePassword@2026"
+password_hash = password.hash(user_password)
+# Output: $argon2id$v=19$m=65536,t=4,p=1$...
+
+# 2. Verify password during login (returns True / False)
+is_valid = password.verify("UserSecurePassword@2026", password_hash)
+if not is_valid:
+    return res.e("Invalid credentials", 401)
+```
+
+---
+
+### 9.4 Stateless Encrypted Token Manager (`token`)
+
+A secure, tamper-proof alternative to standard JWTs, using AES-256-GCM encrypted payloads with optional Client IP and Device Fingerprint binding.
+
+#### Key Features
+- **Global Availability:** Registered in `builtins.token` (`TokenManager`).
+- **Encrypted Payload:** Unlike standard JWTs where data is publicly visible in Base64, token contents are fully encrypted with AES-256-GCM.
+- **Device & IP Fingerprint Binding:** Optionally binds the token to the client's IP and User-Agent device signal to prevent token hijacking.
+- **Key Rotation Support:** Multi-key dictionary support using Key IDs (`kid`).
+
+#### Configuration Setup (`.env`)
+
+```env
+# Minimum 32-character encryption key(s)
+TOKEN_MANAGER_KEYS='{"v1": "a_secure_token_secret_key_minimum_32_chars_12345"}'
+```
+
+#### Usage Example
+
+```python
+# 1. Generate an encrypted session token
+auth_token = token.generate(
+    usecase="auth_session",
+    data={"user_id": 101, "role": "admin"},
+    expiry="2h",           # Supports "15m", "1h", "7d", "30d"
+    use_ip=True,           # Binds token to client IP
+    use_device=True        # Binds token to client device/browser
+)
+
+if auth_token["status"]:
+    token_string = auth_token["token"]
+    # Send token_string to client in Authorization header or cookie
+
+# 2. Verify and decode incoming token
+result = token.verify(token_string, expected_usecase="auth_session")
+
+if not result["status"]:
+    # Returns specific error: "token_expired", "invalid_token", "ip_mismatch", etc.
+    return res.e(f"Authentication failed: {result.get('error')}", 401)
+
+# Successfully authenticated
+user_data = result["data"]  # {"user_id": 101, "role": "admin"}
+user_id = user_data["user_id"]
+```
+
+---
+
+### 9.5 Ed25519 Digital Signature (`dsc`, `dscToken`, `dscVerify`)
+
+Provides high-speed, cryptographically secure digital signatures using **Ed25519** elliptic curves for microservice communication, webhook signing, and tamper-proof data verification.
+
+#### Key Features
+- **Global Availability:** Registered in `builtins.dsc`, `builtins.dscToken`, and `builtins.dscVerify`.
+- **Fast & Modern:** Uses Ed25519 asymmetric cryptography (faster and more secure than legacy RSA).
+- **Canonical Serialization:** Ensures deterministic JSON serialization (`sort_keys=True`) before signing.
+
+#### Usage Example
+
+```python
+# 1. Generate Keypair (creates private.pem and public.pem in directory)
+dscToken("storage/keys/dsc")
+
+# 2. Sign a payload using the private key
+order_data = {"order_id": "ORD-5501", "amount": 1500.0, "status": "approved"}
+signed_package = dsc(order_data, "storage/keys/dsc/private.pem")
+# Output:
+# {
+#   "data": "<base64_canonical_json>",
+#   "token": "<base64_ed25519_signature>"
+# }
+
+# 3. Verify signature using public key (returns True / False)
+is_authentic = dscVerify(
+    order_data,
+    signed_package["token"],
+    "storage/keys/dsc/public.pem"
+)
+
+if not is_authentic:
+    return res.e("Digital signature verification failed! Data altered.", 403)
+```
+
+---
+
+## 10. Anti-Exploit String Validator (`GuardString`)
+
+The `GuardString` utility in `App/src/Validator` sanitizes and validates untrusted user input strings against malicious exploits, homoglyphs, control characters, and Unicode attacks.
+
+### Key Features
+- **Global Availability:** Registered in `builtins.GuardString`, `builtins.validator`, and `builtins.Validator`.
+- **Control Character Detection:** Blocks invisible ASCII and Unicode control codes (`0x00`-`0x1F`, `0x7F`, etc.).
+- **Invisible & Zero-Width Characters:** Blocks zero-width spaces (`\u200B`), soft hyphens, directional overrides, and hidden bypass characters.
+- **Homoglyph & Mixed-Script Defense:** Blocks dangerous mixed alphabet combinations (such as Cyrillic/Greek characters mixed with Latin) to prevent IDN spoofing and impersonation attacks.
+- **Repetition & Size Limits:** Rejects strings exceeding 64KB or characters repeated 100+ times to prevent CPU/memory ReDoS.
+- **NFC Unicode Normalization:** Normalizes input characters to standard Unicode Normalization Form C.
+
+---
+
+### Usage in Code
+
+```python
+# 1. Strict string validation (Default)
+result = GuardString.str(untrusted_input)
+
+if not result["valid"]:
+    error_info = result["errors"][0]
+    return res.e(f"Validation failed: {error_info['message']}", 422)
+
+clean_string = result["value"]
+
+# 2. Relaxed validation (strict=False)
+# Disables control/invisible character checks while keeping 64KB size limit & trim
+relaxed = GuardString.str(user_bio, strict=False)
+
+# 3. Disable auto-trimming (trim=False)
+exact_string = GuardString.str(raw_code, trim=False)
+```
+
+#### Return Format:
+- **On Success:**
+  ```json
+  {
+    "valid": true,
+    "value": "Clean string value"
+  }
+  ```
+- **On Failure:**
+  ```json
+  {
+    "valid": false,
+    "errors": [
+      {
+        "code": "CONTROL_CHARACTERS",
+        "message": "Control characters are not allowed."
+      }
+    ]
+  }
+  ```
+
+---
+
+## 11. Main API Entry Gate (`entry`)
+
+The `entry` utility provides a centralized API Gateway and routing entrypoint in `App/entry.py`. All incoming API requests flow through this gate before reaching individual endpoints, modules, or controllers.
+
+### Key Features
+- **Global Availability:** Registered in `builtins.entry` and `App.app.entry`.
+- **Zero-Boilerplate Mounting:** Mount the entire API gateway onto FastAPI with a single clean call in `main.py`: `entry(app)`.
+- **Pre-Flight Gatekeeper:** Automatically verifies environment readiness, captures client metadata (`user_info`), and logs request paths.
+- **Unified Prefixing:** By default prefixes all attached API endpoints with `/api` (customizable).
+- **Sub-Router Modularization:** Attach sub-routers (e.g. `/v1`, `/auth`, `/users`) using `entry.include_router(...)`.
+
+---
+
+### Usage in Code
+
+#### 1. In `main.py` (Custom Entry Gate with Request Metadata & Checks):
+```python
+from fastapi import FastAPI, Request
+import App.app
+
+app = FastAPI(lifespan=App.app.lifespan)
+App.app.init(app)
+
+# Main API Entry Gate:
+# Yahan se aap IP, Browser, OS, Body, Headers check kar sakte hain,
+# ya SQL / maintenance toggle laga sakte hain (bina automatic background logging ke):
+@entry(app)
+async def gate(request: Request):
+    ip = user_info.ip(request)
+    browser = user_info.browser()
+    os_name = user_info.os()
+    data = await req.b()
+    auth_header = await req.h()
+
+    maintenance = False
+    if maintenance:
+        return res.e("API is currently unavailable", 422)
+    return True
+
+if __name__ == "__main__":
+    App.app.run()
+```
+
+#### 2. Defining or Mounting Sub-Routes via `entry`:
+```python
+from fastapi import APIRouter
+
+# Option A: Direct route on entry
+@entry.get("/status")
+async def api_status():
+    return res.s("API is operational")
+
+# Option B: Attach a modular feature router (e.g. v1 / auth)
+auth_router = APIRouter(prefix="/auth")
+
+@auth_router.post("/login")
+async def login():
+    return res.s("Login successful")
+
+# Include into the entry gate:
+entry.include_router(auth_router)
+# Endpoint is now active at: POST /api/auth/login
+```
+
+#### 3. Default Gateway Health Endpoint:
+Visiting `GET /api` returns the gateway health status:
 ```json
 {
   "status": true,
   "status_code": 200,
-  "message": "User fetched successfully",
+  "message": "API Entry Gate Active",
   "data": {
-    "user_id": 101,
-    "name": "Rahul"
+    "gateway": "online",
+    "prefix": "/api"
   }
 }
 ```
 
-#### Error Response:
-```python
-return res.e("Username is required", 400)
-```
-```json
-{
-  "status": false,
-  "status_code": 400,
-  "message": "Username is required",
-  "data": []
-}
-```
+---
+
+## 12. Asynchronous Redis Client (`redis`)
+
+The `redis` utility in `App/database/redis.py` provides high-performance Redis caching, session storage, and queue management with multi-database support and auto-JSON serialization.
+
+### Key Features
+- **Global Availability:** Registered in `builtins.redis`, directly accessible anywhere without importing.
+- **Dual Execution Mode (`_FlexResult`):** Can be executed **with `await`** in async routes OR **without `await`** in synchronous contexts (tasks are automatically scheduled/resolved).
+- **Multi-Database Support:** Direct database targeting via parameter `db=1`, `db=2`, etc. (defaults to `REDIS_DB=0`).
+- **Auto JSON Serialization:** Directly pass Python dictionaries and lists to `set` and `lpush`; retrieve parsed objects using `as_json=True`.
+- **TTL Support:** Set key expiration directly via `ttl=seconds`.
 
 ---
 
-### 2. Universal Request Accessor (`req`)
-Extracts request body, headers, or query parameters asynchronously without passing parameters through multiple layers:
+### Configuration Setup (`.env`)
 
-#### Body Data (`req.b`):
-```python
-# Get entire body as dict (JSON or Form data)
-body = await req.b()
-
-# Get a specific key from body
-username = await req.b("username")
-```
-
-#### Request Headers (`req.h`):
-```python
-# Get all headers as dict
-headers = await req.h()
-
-# Get a specific header value (case-insensitive)
-token = await req.h("session_token")
-```
-
-#### Query Parameters (`req.q`):
-```python
-# Get all query parameters as dict
-query = await req.q()
-
-# Get a specific query parameter
-page = await req.q("page")
-```
-
----
-
-### 3. Smart File Logger (`log`)
-Automatically identifies the calling file and writes formatted logs to `logs/<caller_file>.log`:
-
-```python
-# 1) Auto-routed string log (saves to logs/<calling_file>.log)
-log("User registered successfully")
-
-# 2) Structured JSON data log
-log({"user_id": 101, "action": "login", "status": "success"})
-
-# 3) Custom destination path
-log("Payment transaction complete", "logs/payments.log")
-```
-
----
-
-### 4. Client & Device Detection (`user_info`)
-Detects client IP (aware of Cloudflare `CF-Connecting-IP` and trusted proxies) and parses client device information:
-
-```python
-# 1) Get single property
-ip = user_info.info("ip")           # Client IP (Proxy & Cloudflare aware)
-browser = user_info.info("browser") # Chrome, Firefox, Safari, Edge, Opera
-os_name = user_info.info("os")      # Windows, Android, iOS, macOS, Linux
-device = user_info.info("device")   # Desktop, Mobile, Tablet
-
-# 2) Get all client info as dictionary
-client_details = user_info.info()
-```
-
----
-
-### 5. Request Payload Limiter (`body`)
-Protects endpoints against memory exhaustion and large payload DoS attacks (`B`, `KB`, `MB`, `GB` supported):
-
-```python
-@router.post("/upload")
-@body.limit("2MB")
-async def upload_file():
-    # If request body > 2MB, automatically raises 413:
-    # {"status": false, "status_code": 413, "message": "Request payload too large.", "data": []}
-    data = await req.b()
-    return res.s("Uploaded successfully", {"size": len(str(data))})
-```
-
----
-
-## 🔐 Security & Cryptography
-
-### 6. Anti-Exploit String Sanitizer (`GuardString`)
-Sanitizes and validates untrusted strings against Unicode exploits, control characters, invisible zero-width characters, excessive repetition, and homoglyph attacks:
-
-```python
-# Validate string input
-result = GuardString.str(user_input, strict=True, trim=True)
-
-if not result["valid"]:
-    # Returns specific error code and message
-    return res.e(result["errors"][0]["message"], 400)
-
-clean_value = result["value"]
-```
-
-#### Success Output:
-```json
-{
-  "valid": true,
-  "value": "Clean string value"
-}
-```
-
-#### Failure Output:
-```json
-{
-  "valid": false,
-  "errors": [
-    {
-      "code": "CONTROL_CHARACTERS",
-      "message": "Control characters are not allowed."
-    }
-  ]
-}
-```
-
----
-
-### 7. Encrypted Token Manager (`token`)
-An ultra-secure, military-grade replacement for standard JWT. Payloads are fully encrypted using **AES-256-GCM**, supporting active key rotation (`kid`), human-readable TTLs, and optional hardware/network security binding:
-
-#### 1) Configuration (`.env`):
 ```env
-TOKEN_MANAGER_KEYS={"v1":"swarg_marg_token_secret_key_32_chars_min_123456"}
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+# Or single connection URL:
+# REDIS_URL=redis://:password@127.0.0.1:6379/0
 ```
 
-#### 2) Generate Token (`token.generate`):
-```python
-# Standard Token (Default expiry: "1H")
-res_token = token.generate("auth", {"user_id": 101, "role": "admin"}, expiry="1H")
+---
 
-# Token with Device & IP Binding (Locks token to current device & network)
-res_token = token.generate(
-    usecase="auth",
-    data={"user_id": 101, "role": "admin"},
-    expiry="2H",            # Supports: "30M", "1H", "7D", "1MO", "1Y" or seconds
-    use_ip=True,            # Token will be valid ONLY from this IP
-    use_device=True         # Token will be valid ONLY from this browser/device
+### Usage in Code
+
+#### 1. Calling Without `await` (Sync / Background scheduling):
+```python
+# Default DB (REDIS_DB=0) mein TTL ke saath set
+redis.set("otp:9876543210", "482910", ttl=120)
+
+# Specific DB (db=1) mein TTL ke saath set
+redis.set("otp:9876543210", "482910", ttl=120, db=1)
+
+# Dict / list bhi directly pass kar sakte hain (auto JSON)
+redis.set("user:101", {"name": "Rohit", "city": "Kanpur"}, ttl=300, db=2)
+
+# List mein items push karna (ttl aur db ke saath)
+redis.lpush("events:user:101", "login", "viewed_order", ttl=600)
+redis.lpush("jobs:email", {"to": "a@example.com", "tpl": "welcome"}, ttl=900, db=1)
+
+# Key delete karna (default DB ya specific DB)
+redis.delete("otp:9876543210")
+redis.delete("otp:9876543210", db=1)
+
+# Health Check bina await ke
+redis.isConnected()
+redis.isConnected(db=1)
+```
+
+---
+
+#### 2. Calling With `await` (Async Routes):
+```python
+# Default DB (REDIS_DB=0) mein TTL ke saath set
+await redis.set("otp:9876543210", "482910", ttl=120)
+
+# Specific DB (db=1) mein TTL ke saath set
+await redis.set("otp:9876543210", "482910", ttl=120, db=1)
+
+# Dict / list bhi directly pass kar sakte hain (auto JSON)
+await redis.set("user:101", {"name": "Rohit", "city": "Kanpur"}, ttl=300, db=2)
+
+# Retrieve data (as_json=True for dict/list)
+user = await redis.get("user:101", as_json=True, db=2)
+
+# List mein items push karna (ttl aur db ke saath)
+await redis.lpush("events:user:101", "login", "viewed_order", ttl=600)
+await redis.lpush("jobs:email", {"to": "a@example.com", "tpl": "welcome"}, ttl=900, db=1)
+
+# List se items retrieve karna
+events = await redis.lrange("events:user:101", 0, -1)
+
+# Key delete karna (default DB ya specific DB)
+await redis.delete("otp:9876543210")
+await redis.delete("otp:9876543210", db=1)
+
+# Health Check await ke saath (result boolean return hota hai)
+connected = await redis.isConnected()
+connected_db1 = await redis.isConnected(db=1)
+```
+
+---
+
+## 13. CORS Configuration (`cors`)
+
+The CORS utility in `App/security/cors.py` configures Cross-Origin Resource Sharing on FastAPI to control which frontend origins, headers, and HTTP methods can access your API.
+
+### Key Features
+- **Global Availability:** Registered in `builtins.cors`.
+- **Automatic Initialization:** Automatically configured during `App.app.init(app)` using `.env` settings.
+- **Customizable:** Can be invoked directly with custom origins, headers, and methods: `cors(app, origins=["https://myfrontend.com"])`.
+- **Configurable Credentials & Max Age:** Supports `allow_credentials=True` and preflight cache duration.
+
+---
+
+### Configuration Setup (`.env`)
+
+Add the following 5 settings to your `.env` file:
+
+```env
+# 1. Allowed Origins (Domain whitelist)
+CORS_ORIGINS=*
+
+# 2. Allowed Headers
+CORS_HEADERS=*
+
+# 3. Allowed HTTP Methods
+CORS_METHODS=*
+
+# 4. Allow Cookies / Authorization Headers
+CORS_CREDENTIALS=true
+
+# 5. Preflight Cache Duration (in seconds)
+CORS_MAX_AGE=600
+```
+
+---
+
+### How to Configure Each Setting (`.env` Guide)
+
+| Setting Key | Default | Example Value | Description & How to Use |
+| :--- | :--- | :--- | :--- |
+| **`CORS_ORIGINS`** | `*` | `*`<br>or<br>`https://frontend.com,https://admin.site.com` | **Frontend Domains:** Defines which origins can make requests to your API.<br>• Use `*` to allow all origins (ideal for development or public APIs).<br>• In production, list specific allowed domains separated by commas. |
+| **`CORS_HEADERS`** | `*` | `*`<br>or<br>`Authorization,Content-Type,Accept` | **Request Headers:** Defines which custom HTTP headers clients are allowed to send.<br>• Use `*` to accept all request headers.<br>• In strict production setups, list only headers used by your frontend. |
+| **`CORS_METHODS`** | `*` | `*`<br>or<br>`GET,POST,PUT,DELETE,OPTIONS` | **HTTP Methods:** Whitelist allowed HTTP verbs.<br>• Use `*` to accept all verbs (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD).<br>• Or restrict to specific methods separated by commas. |
+| **`CORS_CREDENTIALS`** | `true` | `true` or `false` | **Cookies & Auth Headers:** Whether browsers are allowed to expose responses to frontend JavaScript when credentials (cookies, HTTP auth) are sent.<br>• Set to `true` if your frontend sends cookies or auth headers.<br>• Set to `false` for public stateless APIs. |
+| **`CORS_MAX_AGE`** | `600` | `600` or `3600` | **Preflight Cache (Seconds):** How long (in seconds) the browser can cache the preflight `OPTIONS` response.<br>• `600` = 10 minutes.<br>• Eliminates redundant `OPTIONS` requests on every API call, speeding up response times. |
+
+---
+
+### Environment Setup Examples
+
+#### 1. Development Environment (Permissive)
+```env
+CORS_ORIGINS=*
+CORS_HEADERS=*
+CORS_METHODS=*
+CORS_CREDENTIALS=true
+CORS_MAX_AGE=600
+```
+
+#### 2. Production Environment (Strict Whitelist)
+```env
+CORS_ORIGINS=https://myfrontend.com,https://admin.myfrontend.com
+CORS_HEADERS=Authorization,Content-Type,Accept,X-Requested-With
+CORS_METHODS=GET,POST,PUT,DELETE,PATCH,OPTIONS
+CORS_CREDENTIALS=true
+CORS_MAX_AGE=3600
+```
+
+---
+
+### Usage in Code
+
+#### 1. Automatic (Default via `App.app.init`):
+CORS is automatically loaded from `.env` when initializing the application:
+```python
+import App.app
+
+App.app.init(app)  # CORS middleware is applied automatically from .env
+```
+
+#### 2. Explicit or Custom Origins (`cors`):
+```python
+# Custom origin configuration:
+cors(
+    app,
+    origins=["https://myfrontend.com", "https://admin.myfrontend.com"],
+    headers=["Authorization", "Content-Type", "Accept"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials=True,
+    max_age=3600,
 )
 ```
 
-**Success Response (`token.generate`):**
-```json
-{
-  "status": true,
-  "token": "v1.wgpNIcq2aaF1yTAjTwXSU6+5pVZM19LndVUW93gqJ5q6wFhTySZzo5mVBlaoZLl0V6m+1mrwGBmSDx4d72r3mrXFzArqVYAPiE0e9LclPZB22rZrCaTCqnlqOV1ZhAKQ2osa3nGDDoIawfFWWaHaJLgdWaM4PtmkUwLlA4l5Lj3WrqR15bkLg4x7V63oVmLtC80Jx16AH2TTnlYIQAVP8o7PgE1n/8wvf4cg/LetXx0hBx5/n4GQTWD+GhK1W+EP6T8nc78/NiXff+4VGZ+/T1nXwFjhYgra8Jwd9MundvkmGN0N/E+enboz6EHTxDzkeTJkUcnqyOKnlGlL+raHX6WHkl3lpb0UE7Fp+hGoFnLBCk906ClqqXT6MiXDm00lmcUZJGCU1sfHN1Vr3G1+WJIXK2XIVdqkcMuCkhg5QQPUhfMKC3P7DW1M1OwLxqsZ88pQ5y/woB9jFxBblgEIdw==",
-  "jti": "iXBZR3VsuO6rM_k3IMb5P-2HwyuayFHo29G4KxUeHOA1Y0joDIUiGWZD8lFRcYBXtr7_rAK_iavdr0ls0jXpCg",
-  "usecase": "auth",
-  "expires_at": 1795547467
-}
-```
+---
 
-#### 3) Verify Token (`token.verify`):
+## 14. Complete API Endpoint Guide (Step-by-Step with SlowAPI)
+
+This section demonstrates how to create a complete, production-ready API endpoint in the `routes/` directory using all framework utilities:
+- **`APIRouter`** (FastAPI route controller)
+- **`slowapi`** (Official Rate Limiting per IP)
+- **`@body.limit`** (Payload size restriction)
+- **`req.b()` / `req.h()`** (Request body & header accessor)
+- **`res.s()` / `res.e()`** (Standardized responses)
+- **Automatic Routing** (No manual imports required in `main.py`)
+
+---
+
+### 1. Folder Structure & Automatic URL Routing
+
+Any `.py` file placed inside the `routes/` directory is automatically discovered and mounted under the `/api` entry gateway:
+
+| File Location | Endpoint Prefix | Example Full URL |
+| :--- | :--- | :--- |
+| `routes/auth.py` | `/auth` | `POST /api/auth/login` |
+| `routes/user/login.py` | `/user/login` | `POST /api/user/login` |
+| `routes/user/register.py` | `/user/register` | `POST /api/user/register` |
+
+You **never need to modify `main.py`** to add or import new route files.
+
+---
+
+### 2. Full Working Example: `routes/auth.py`
+
+Create or edit your route file in `routes/auth.py`:
+
 ```python
-# Verify token against expected usecase
-res_verify = token.verify(auth_token, expected_usecase="auth")
+from fastapi import APIRouter, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Standard Official SlowAPI Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+
+# Create FastAPI Router
+router = APIRouter()
+
+
+# ==============================================================================
+# 1. Login Endpoint with Rate Limiting & Payload Guards
+# ==============================================================================
+@router.post("/login")
+@limiter.limit("5/minute")        # SlowAPI: Maximum 5 attempts per minute per IP
+@body.limit("100KB")             # Body Limit: Maximum 100 KB payload size
+async def auth_login(request: Request):
+    """
+    User login endpoint.
+    Auto URL: POST /api/auth/login
+    """
+    # 1. Extract JSON / Form Body
+    data = await req.b(request)
+    email = data.get("email")
+    raw_password = data.get("password")
+
+    # 2. Input Validation
+    if not email or not raw_password:
+        return res.e("Email and password are required", 400)
+
+    # 3. Sanitization with GuardString (Anti-Exploit)
+    clean_email = GuardString(email).trim().lower().get()
+
+    # 4. Query User from Database (SQLite / Postgres / MySQL)
+    query = "SELECT id, email, password_hash, status FROM users WHERE email = :email LIMIT 1"
+    users = DB.raw(query, {"email": clean_email})
+
+    if not users:
+        return res.e("Invalid email or password", 401)
+
+    user = users[0]
+
+    # 5. Verify Password with Argon2
+    if not password.verify(raw_password, user["password_hash"]):
+        return res.e("Invalid email or password", 401)
+
+    # 6. Generate Secure JWT Token
+    jwt_token = token.create({"sub": str(user["id"]), "email": clean_email})
+
+    # 7. Success Response
+    return res.s(
+        "Login successful",
+        {
+            "token": jwt_token,
+            "user": {
+                "id": user["id"],
+                "email": user["email"],
+            },
+        },
+    )
+
+
+# ==============================================================================
+# 2. Registration Endpoint
+# ==============================================================================
+@router.post("/register")
+@limiter.limit("3/minute")        # SlowAPI: Maximum 3 registrations per minute per IP
+@body.limit("100KB")             # Body Limit: Maximum 100 KB payload size
+async def auth_register(request: Request):
+    """
+    User registration endpoint.
+    Auto URL: POST /api/auth/register
+    """
+    data = await req.b(request)
+    email = data.get("email")
+    raw_password = data.get("password")
+
+    if not email or not raw_password:
+        return res.e("Email and password are required", 400)
+
+    clean_email = GuardString(email).trim().lower().get()
+
+    # Hash Password with Argon2id
+    hashed_pwd = password.hash(raw_password)
+
+    # Insert into Database
+    insert_sql = "INSERT INTO users (email, password_hash) VALUES (:email, :pwd)"
+    DB.raw(insert_sql, {"email": clean_email, "pwd": hashed_pwd})
+
+    return res.s("Registration successful", {"email": clean_email})
 ```
 
-**Success Response (`token.verify`):**
-```json
-{
-  "status": true,
-  "jti": "iXBZR3VsuO6rM_k3IMb5P-2HwyuayFHo29G4KxUeHOA1Y0joDIUiGWZD8lFRcYBXtr7_rAK_iavdr0ls0jXpCg",
-  "usecase": "auth",
-  "data": {
-    "user_id": 101,
-    "role": "admin"
-  },
-  "meta": {
-    "iat": 1795543867,
-    "exp": 1795547467,
-    "ip_bind": false,
-    "device_bind": false,
-    "kid": "v1"
+---
+
+### 3. How Rate Limiting Works (`slowapi`)
+
+- **Limiter Definition:** `limiter = Limiter(key_func=get_remote_address)` extracts the client's real IP address.
+- **Decorator:** `@limiter.limit("5/minute")` or `@limiter.limit("100/hour")` restricts requests.
+- **Request Parameter Requirement:** SlowAPI requires `request: Request` to be declared as an argument in the endpoint function so it can read the client IP address and headers.
+- **Automatic 429 Response:** When a client exceeds the allowed limit, the application's global exception handler automatically intercepts `RateLimitExceeded` and returns HTTP 429:
+  ```json
+  {
+    "status": false,
+    "status_code": 429,
+    "message": "Rate limit exceeded",
+    "data": []
   }
-}
-```
-
-#### 4) Error Responses (`token.verify`):
-When a token is missing, expired, or tampered with, `token.verify` returns a clean error dictionary without throwing unhandled exceptions:
-
-* **Token missing or invalid format:**
-  ```json
-  { "status": false, "error": "invalid_token" }
-  ```
-* **Token expired:**
-  ```json
-  { "status": false, "error": "token_expired" }
-  ```
-* **Client IP changed (`use_ip=True`):**
-  ```json
-  { "status": false, "error": "ip_mismatch" }
-  ```
-* **Device or browser changed (`use_device=True`):**
-  ```json
-  { "status": false, "error": "device_mismatch" }
-  ```
-* **Tampered payload or fingerprint:**
-  ```json
-  { "status": false, "error": "fingerprint_mismatch" }
   ```
 
----
 
-### 8. Argon2id Password Hasher (`password`)
-OWASP-recommended standard for secure password hashing with constant-time verification:
 
-```python
-# 1) Hash Password
-hashed = password.hash("UserSecretPass@123")
-# Output: "$argon2id$v=19$m=65536,t=4,p=1$..."
 
-# 2) Verify Password (Returns True or False)
-is_valid = password.verify("UserSecretPass@123", hashed)
-```
 
----
 
-### 9. Authenticated AES-256-GCM (`aes`)
-Authenticated symmetric encryption with RFC 5869 HKDF key derivation and domain separation:
 
-```python
-# 1) Encrypt string, dict, list, or bytes
-encrypted_token = aes.e("Secret message", "my_secret_key_123")
-json_token = aes.e({"user_id": 101, "role": "admin"}, "my_secret_key_123")
-```
-
-**Output Example:**
-```text
-# encrypted_token:
-Nu/K1KrjoXYzrSM0XZsHZS7NTJ41e1gUnwoTMKhfmmhtcFMik0QeRHNn
-
-# json_token:
-yRrebhfgTRTEeExeCWoylmKIqZ3NXQF//kZZoBJgsrKhFjliQPtNYDjT/R54M+ai/34hvEvZYD4z9A==
-```
-
-```python
-# 2) Decrypt back to string (Returns None if wrong key or tampered)
-text = aes.d(encrypted_token, "my_secret_key_123")
-# Output: "Secret message"
-
-# Decrypt back to dictionary
-data = aes.d(json_token, "my_secret_key_123", as_json=True)
-# Output: {"user_id": 101, "role": "admin"}
-```
-
----
-
-### 10. Ed25519 Digital Signature Cryptography (`dsc`)
-Asymmetric cryptographic key generation, digital signing, and verification:
-
-```python
-# 1) Generate Key Pair (private.pem and public.pem)
-dscToken("keys/directory")
-
-# 2) Sign Data
-signature = dsc({"user_id": 101}, "keys/directory/private.pem")
-# Returns: {"data": "...", "token": "..."}
-
-# 3) Verify Signature (Supports entire dict or direct token string)
-is_valid = dscVerify({"user_id": 101}, signature, "keys/directory/public.pem")
-# or:
-is_valid = dscVerify({"user_id": 101}, signature["token"], "keys/directory/public.pem")
-```
-
----
-
-### 11. Base64 Utility (`base`)
-Fast Base64 encoding and decoding with native JSON parsing support:
-
-```python
-# 1) Encode
-token = base.e("Hello World")
-json_token = base.e({"user_id": 101, "role": "admin"})
-
-# 2) Decode
-text = base.d(token)
-data = base.d(json_token, as_json=True)
-```
-
----
-
-## 🗄️ Database Drivers
-
-### 12. MySQL Database Manager (`DB` & `MySQLDB`)
-Supports multiple concurrent database targets configured via `.env` JSON strings, connection pooling with SHA-256 configuration hashing, auto-reconnect, colon named parameters (`:param`), and transactional execution:
-
-#### 1) Configuration in `.env`:
-```env
-user={"DB_HOST":"127.0.0.1","DB_PORT":3306,"DB_NAME":"main_app_db","DB_USER":"root","DB_PASS":"ruyebyr8563476nx7tb3@4#$#$#@21"}
-```
-
-#### 2) Database Operations & Queries (`DB.raw`):
-```python
-# 1. INSERT (Returns affected rowcount)
-inserted = DB.raw(
-    env("user"),
-    "INSERT INTO users (name, email, status) VALUES (:name, :email, :status)",
-    {
-        "name": "Amit Sharma",
-        "email": "amit@example.com",
-        "status": "active",
-    },
-)
-
-# 2. SELECT (Single row)
-rows = DB.raw(
-    env("user"),
-    "SELECT id, name, email, status FROM users WHERE email = :email LIMIT 1",
-    {"email": "amit@example.com"},
-)
-user = rows[0] if rows else None
-
-# 3. SELECT (Multiple rows)
-active_users = DB.raw(
-    env("user"),
-    "SELECT id, name, email FROM users WHERE status = :status ORDER BY id DESC LIMIT 20",
-    {"status": "active"},
-)
-
-# 4. UPDATE (Record update)
-updated = DB.raw(
-    env("user"),
-    "UPDATE users SET status = :status WHERE email = :email",
-    {
-        "status": "inactive",
-        "email": "amit@example.com",
-    },
-)
-
-# 5. TRANSACTION (Manual Control with rollback & direct response)
-try:
-    DB.begin_transaction(env("user"))
-
-    # Step 1: Debit
-    debited = DB.raw(
-        env("user"),
-        "UPDATE wallets SET balance = balance - :amt WHERE user_id = :from_id AND balance >= :amt",
-        {"amt": 500, "from_id": 1},
-    )
-    if debited == 0:
-        DB.rollback(env("user"))
-        return res.e("Insufficient balance or sender wallet not found", 400)
-
-    # Step 2: Credit
-    credited = DB.raw(
-        env("user"),
-        "UPDATE wallets SET balance = balance + :amt WHERE user_id = :to_id",
-        {"amt": 500, "to_id": 2},
-    )
-    if credited == 0:
-        DB.rollback(env("user"))
-        return res.e("Receiver wallet not found", 400)
-
-    # Commit after all steps succeed
-    DB.commit(env("user"))
-    return res.s("Amount transferred successfully")
-
-except Exception as e:
-    DB.rollback(env("user"))
-    return res.e("Transaction failed: " + str(e), 500)
-
-# 6. DELETE (Record removal)
-deleted = DB.raw(
-    env("user"),
-    "DELETE FROM users WHERE email = :email",
-    {"email": "amit@example.com"},
-)
-```
-
-#### 3) Connection Check (`MySQLDB.is_connected`):
-```python
-is_ok, err = MySQLDB.is_connected(env("user"))
-# Returns: (True, None) or (False, "error message")
-```
-
----
-
-### 13. PostgreSQL Database Manager (`pg`)
-Supports multi-database PostgreSQL targets configured via `.env` JSON strings, connection pooling with SHA-256 configuration hashing, automatic liveness checks, colon named parameters (`:param`), and transactional execution:
-
-#### 1) Configuration in `.env`:
-```env
-pg_user={"DB_HOST":"127.0.0.1","DB_PORT":5432,"DB_NAME":"main_app_db","DB_USER":"postgres","DB_PASS":"your_secure_password"}
-```
-
-#### 2) Core Operations with `pg.raw`:
-```python
-# 1. SELECT (Fetch records as dictionaries)
-users = pg.raw(
-    env("pg_user"),
-    "SELECT id, name, email FROM users WHERE status = :status",
-    {"status": "active"},
-)
-
-# 2. INSERT (Record creation)
-inserted = pg.raw(
-    env("pg_user"),
-    "INSERT INTO users (name, email) VALUES (:name, :email)",
-    {"name": "Satyam", "email": "satyam@example.com"},
-)
-
-# 3. INSERT with RETURNING (PostgreSQL Native)
-new_user = pg.raw(
-    env("pg_user"),
-    "INSERT INTO users (name, email) VALUES (:name, :email) RETURNING id, created_at",
-    {"name": "Rahul", "email": "rahul@example.com"},
-)
-
-# 4. UPDATE (Modify records)
-updated = pg.raw(
-    env("pg_user"),
-    "UPDATE users SET name = :name WHERE email = :email",
-    {"name": "Satyam Kumar", "email": "satyam@example.com"},
-)
-
-# 5. ATOMIC TRANSACTIONS (Context Manager)
-with pg.transaction(env("pg_user")):
-    pg.raw(
-        env("pg_user"),
-        "UPDATE wallets SET balance = balance - :amt WHERE user_id = :id",
-        {"amt": 100, "id": 1},
-    )
-    pg.raw(
-        env("pg_user"),
-        "UPDATE wallets SET balance = balance + :amt WHERE user_id = :id",
-        {"amt": 100, "id": 2},
-    )
-
-# 6. DELETE (Record removal)
-deleted = pg.raw(
-    env("pg_user"),
-    "DELETE FROM users WHERE email = :email",
-    {"email": "satyam@example.com"},
-)
-
-# 7. Connection Check
-is_ok, err = pg.is_connected(env("pg_user"))
-```
-
----
-
-### 14. Asynchronous Redis Client (`redis`)
-Globally accessible Redis instance with multi-database connection pooling, auto-delegation to default `REDIS_DB=0`, and optional `db` targeting:
-
-```python
-# 1) String operations (Default DB: REDIS_DB from .env, defaults to 0)
-await redis.set("name", "Satyam")
-name = await redis.get("name")
-
-# 2) Specific database via db parameter (e.g. DB 1)
-await redis.set("name", "Satyam", db=1)
-name = await redis.get("name", db=1)
-
-# 3) Specific database via helper (redis.db(1) or redis(1))
-await redis.db(1).set("name", "Satyam")
-await redis(1).set("name", "Satyam")
-
-# 4) Delete & Expire
-await redis.delete("name")
-await redis.expire("name", 300)
-# or on specific DB:
-await redis.delete("name", db=1)
-
-# 5) Queues / Lists (RPUSH, LRANGE, LPOP)
-await redis.rpush("queue", "task1")
-tasks = await redis.lrange("queue", 0, -1)
-task = await redis.lpop("queue")
-
-# 6) Health Check
-is_alive = await redis.isConnected()       # Checks default DB
-is_alive_db1 = await redis.isConnected(1)  # Checks DB 1
-```
-
----
-
-### 15. Asynchronous SQLite Driver (`sqlite`)
-High-performance asynchronous SQLite connector running in **WAL mode** with query thread-safety:
-
-```python
-# Connect to SQLite database file
-db = await sqlite.connect("database/app.db")
-
-# Run query
-rows = await db.raw("SELECT * FROM users WHERE status = ?", ["active"])
-```
-
----
-
-## 🚀 Running the Server
-
-Start the development server with hot-reload enabled:
-
-```bash
-# Using Uvicorn CLI
-uvicorn main:app --reload
-
-# Or directly via Python
-python main.py
-```
-
----
-
-## 🌐 API Documentation
-
-Once the server is running, explore the interactive documentation:
-
-* **Interactive Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-* **Structured ReDoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-* **OpenAPI Specification:** [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
-
----
-
-<div align="center">
-  <sub>Built with ❤️ using FastAPI, Cryptography, and Python Asynchronous Architecture.</sub>
-</div>

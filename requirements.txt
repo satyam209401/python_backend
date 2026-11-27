@@ -8,3 +8,4 @@ aiosqlite
 argon2-cffi
 pymysql
 psycopg2-binary
+sqlite-web

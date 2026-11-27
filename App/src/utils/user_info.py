@@ -69,7 +69,9 @@ class UserInfo:
 
     @staticmethod
     def browser(ua=None):
-        if ua is None:
+        if isinstance(ua, Request):
+            ua = ua.headers.get("user-agent", "").strip()
+        elif ua is None:
             req = _request_ctx.get()
             ua = req.headers.get("user-agent", "").strip() if req else ""
 
@@ -88,7 +90,9 @@ class UserInfo:
 
     @staticmethod
     def os(ua=None):
-        if ua is None:
+        if isinstance(ua, Request):
+            ua = ua.headers.get("user-agent", "").strip()
+        elif ua is None:
             req = _request_ctx.get()
             ua = req.headers.get("user-agent", "").strip() if req else ""
 
@@ -107,7 +111,11 @@ class UserInfo:
 
     @staticmethod
     def device(ua=None):
-        if ua is None:
+        if isinstance(ua, Request):
+            ua = ua.headers.get("user-agent", "").strip()
+        elif ua is None:
+            req = _request_ctx.get()
+            ua = req.headers.get("user-agent", "").strip() if req else ""
             req = _request_ctx.get()
             ua = req.headers.get("user-agent", "").strip() if req else ""
 

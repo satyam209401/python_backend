@@ -5,6 +5,7 @@ __pycache__/
 
 pyenv/
 venv/
+.venv/
 .env
 !.env.example
 

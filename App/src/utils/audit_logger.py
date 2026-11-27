@@ -23,6 +23,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 APP_ERROR_MESSAGE = "An unexpected error occurred. Please try again later."
 APP_ERROR_DATA = []
 APP_ERROR_STATUS_CODE = 500
+APP_ERROR_CODE = 999
 
 
 class AuditAppException(Exception):
@@ -31,9 +32,9 @@ class AuditAppException(Exception):
     def __init__(
         self,
         message: str = APP_ERROR_MESSAGE,
-        status_code: int = APP_ERROR_STATUS_CODE,
+        status_code: int = APP_ERROR_CODE,
         data: Any = APP_ERROR_DATA,
-        code: str = "APP_ERROR",
+        code: str | int = APP_ERROR_CODE,
         skip_log: bool = False,
         internal_message: str | None = None,
     ) -> None:
@@ -79,25 +80,51 @@ class res:
         extra: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
     ) -> JSONResponse:
+        extra = extra or {}
+        req = extra.get("request")
+        req_id = AuditLogger.get_request_id(req)
+
         if log_error:
-            AuditLogger.log("ERROR", code, message, extra or {})
+            AuditLogger.log("ERROR", code, message, extra)
 
         AuditLogger.mark_response_sent()
         payload = {
             "status": False,
             "status_code": status_code,
             "message": message,
+            "error_id": req_id,
             "data": [] if data is None else data,
         }
+        res_headers = dict(headers or {})
+        if req_id:
+            res_headers["X-Error-ID"] = req_id
         return JSONResponse(
             status_code=status_code,
             content=payload,
-            headers=headers,
+            headers=res_headers,
         )
 
 
-def _app_error_response(headers: dict[str, str] | None = None) -> JSONResponse:
-    return res.e(APP_ERROR_MESSAGE, APP_ERROR_STATUS_CODE, APP_ERROR_DATA, headers=headers)
+def _app_error_response(
+    req_id: str | None = None,
+    headers: dict[str, str] | None = None,
+    message: str = APP_ERROR_MESSAGE,
+    error_code: int = 999,
+) -> JSONResponse:
+    if not req_id:
+        req_id = AuditLogger.get_request_id()
+
+    error_data: dict[str, Any] = {"error_id": req_id} if req_id else {}
+    from App.src.utils.response import res as app_res
+
+    resp = app_res.s(message, error_data, error_code)
+    if req_id:
+        resp.headers["X-Error-ID"] = req_id
+        resp.headers["X-Request-ID"] = req_id
+    if headers:
+        for k, v in headers.items():
+            resp.headers[k] = v
+    return resp
 
 
 class AuditLogger:
@@ -115,19 +142,23 @@ class AuditLogger:
 
     @classmethod
     def get_sqlite_db_path(cls) -> Path:
-        env_path = os.getenv("audit_logs")
+        base_root = Path(__file__).resolve().parents[3]
+        env_path = None
+        import builtins
+        if hasattr(builtins, "env") and callable(builtins.env):
+            try:
+                env_path = builtins.env("runtime_time_log") or builtins.env("audit_logs")
+            except Exception:
+                pass
         if not env_path:
-            import builtins
-            if hasattr(builtins, "env") and callable(builtins.env):
-                try:
-                    env_path = builtins.env("audit_logs")
-                except Exception:
-                    pass
+            env_path = os.getenv("runtime_time_log") or os.getenv("audit_logs")
+
         if env_path and str(env_path).strip():
             p = Path(str(env_path).strip())
+            if not p.is_absolute():
+                p = (base_root / p).resolve()
         else:
-            base_root = Path(__file__).resolve().parents[3]
-            p = base_root / "db" / "audit_logs.sqlite"
+            p = (base_root / "db" / "runtime_time_log.sqlite").resolve()
 
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -159,6 +190,9 @@ class AuditLogger:
                     occurrences INTEGER DEFAULT 1,
                     UNIQUE(ip, file, error)
                 );
+            """)
+            cur.execute("""
+                CREATE VIEW IF NOT EXISTS runtime_time_log AS SELECT * FROM audit_logs;
             """)
             conn.commit()
         finally:
@@ -272,7 +306,8 @@ class AuditLogger:
                     },
                 )
 
-            return _app_error_response()
+            req_id = cls.get_request_id(request)
+            return _app_error_response(req_id=req_id, message=exc.message, error_code=999)
 
         @app.exception_handler(Exception)
         async def _global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -529,14 +564,16 @@ class AuditLogger:
             import msvcrt
 
             fp.seek(0)
-            while True:
+            retries = 0
+            while retries < 20:
                 try:
                     msvcrt.locking(fp.fileno(), msvcrt.LK_LOCK, 1)
                     break
                 except OSError as exc:
                     if exc.errno not in (errno.EACCES, errno.EDEADLK):
-                        raise
+                        break
                     time.sleep(0.005)
+                    retries += 1
         else:
             import fcntl
 
@@ -732,7 +769,7 @@ class AuditLogger:
         exc: BaseException,
         request: Request | None = None,
         code: str = "EXCEPTION",
-        http_status: int = 500,
+        http_status: int = 501,
         skip_log: bool = False,
         client_message: str | None = None,
     ) -> JSONResponse:
@@ -757,7 +794,9 @@ class AuditLogger:
                 },
             )
 
-        return _app_error_response()
+        req_id = cls.get_request_id(request)
+        msg = client_message or APP_ERROR_MESSAGE
+        return _app_error_response(req_id=req_id, message=msg, error_code=999)
 
 
 class AuditLoggerMiddleware(BaseHTTPMiddleware):
