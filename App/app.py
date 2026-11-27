@@ -52,6 +52,12 @@ from App.src.utils.user_info import user_info
 
 builtins.user_info = user_info
 
+# --- HTTP Client Utility (Zero Dependency) ---
+from App.src.utils.http import http, HttpClient
+
+builtins.http = http
+builtins.HttpClient = HttpClient
+
 # --- SQLite Web Utility ---
 from App.database.sqlite_web import sqlite
 

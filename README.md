@@ -32,6 +32,7 @@ A high-performance, modular, and enterprise-grade Python backend framework built
 - [12. Asynchronous Redis Client (`redis`)](#12-asynchronous-redis-client-redis)
 - [13. CORS Configuration (`cors`)](#13-cors-configuration-cors)
 - [14. Complete API Endpoint Guide (Step-by-Step with SlowAPI)](#14-complete-api-endpoint-guide-step-by-step-with-slowapi)
+- [15. Zero-Dependency HTTP Client (`http`)](#15-zero-dependency-http-client-http)
 - [🚀 How to Run the Project (Step-by-Step Guide)](#how-to-run-the-project-project-run-kaise-karein)
 
 ---
@@ -91,6 +92,7 @@ py_backend/
 │       ├── utils/                # Injected Global Utilities
 │       │   ├── audit_logger.py   # High-throughput SQLite runtime performance logger
 │       │   ├── body.py           # Request body size limiter decorator (@body.limit)
+│       │   ├── http.py           # Zero-dependency HTTP client (http.get, http.post)
 │       │   ├── log.py            # Daily structured JSON file logger
 │       │   ├── req.py            # Request accessor (headers, client IP, params)
 │       │   ├── response.py       # Standardized API response builder (res.s, res.e)
@@ -116,7 +118,7 @@ py_backend/
 
 | Feature | Description |
 | :--- | :--- |
-| **Global Builtins Injection** | `env`, `res`, `req`, `log`, `body`, `user_info`, `token`, `limiter`, `DB`, `redis` pure application me bina kisi import ke directly accessible hain. |
+| **Global Builtins Injection** | `env`, `res`, `req`, `log`, `body`, `user_info`, `token`, `limiter`, `DB`, `redis`, `http` pure application me bina kisi import ke directly accessible hain. |
 | **Zero-Config AutoRouter** | `routes/` directory me koi bhi `.py` file add karein, wo automatically `/api/...` prefix ke saath mount ho jati hai. `main.py` ko touch karne ki jarurat nahi. |
 | **Enterprise Cryptography** | AES-256-GCM, Argon2id, Ed25519 digital signatures, aur CSPRNG unique token generation out-of-the-box integrated hai. |
 | **High-Throughput Audit Logging** | Har incoming request ka execution time, status code, IP, aur endpoint asynchronous SQLite database me log hota hai. |
@@ -1259,6 +1261,97 @@ limiter = Limiter(key_func=get_remote_address)
     "data": []
   }
   ```
+
+---
+
+## 15. Zero-Dependency HTTP Client (`http`)
+
+The framework includes a built-in, lightweight HTTP client (`http`) powered entirely by Python's native standard library (`urllib.request`). It requires **zero external third-party dependencies** (no `requests` or external packages needed) while providing a modern, developer-friendly API.
+
+### Key Features
+- **Global Availability:** Registered in `builtins.http`, accessible everywhere across your routes and services without `import`.
+- **Zero External Dependencies:** Built 100% on Python's native `urllib` standard library.
+- **Smart JSON Handling:** Passing a Python dictionary or list automatically serializes it to JSON and attaches the `Content-Type: application/json` header.
+- **Default Safe Timeout:** Comes with a built-in 10-second timeout to prevent third-party API freezes from hanging your server.
+- **Crash-Free Error Handling:** 4xx and 5xx HTTP responses do not raise unhandled exceptions; they safely return an `HttpResponse` object with `status_code`, `ok=False`, and error details.
+- **Direct Dict-Like Indexing:** If the response is a JSON object, access fields directly via `res["key"]` or `res.get("key")`.
+
+---
+
+### Usage in Code
+
+#### 1. HTTP GET Request
+```python
+# 1. Simple GET
+res = http.get("https://api.example.com/users")
+
+# 2. GET with Query Parameters & Custom Headers
+res = http.get(
+    "https://api.example.com/search",
+    params={"query": "fastapi", "page": 1},
+    headers={"Authorization": "Bearer YOUR_ACCESS_TOKEN"}
+)
+
+if res.ok:
+    print("Status:", res.status_code)        # 200
+    print("User Name:", res["data"]["name"]) # Direct dict indexing
+    print("Full JSON:", res.json())          # Parsed dictionary / list
+```
+
+---
+
+#### 2. HTTP POST Request
+```python
+# 1. Direct JSON Payload (Dict pass karte hi auto-JSON ban jata hai)
+user_payload = {
+    "name": "Satyam",
+    "email": "satyam@example.com",
+    "role": "admin"
+}
+
+res = http.post("https://api.example.com/users", user_payload)
+
+# 2. POST with Custom Headers (e.g. Bearer Token)
+res = http.post(
+    "https://api.example.com/secure",
+    {"key": "value"},
+    headers={"Authorization": "Bearer xyz"}
+)
+
+if res:  # Truthy if status is 2xx
+    print("Created successfully:", res["id"])
+else:
+    print("Request failed with status:", res.status_code, "Error:", res.error)
+```
+
+---
+
+#### 3. PUT, PATCH, and DELETE Requests
+```python
+# Update resource (PUT)
+res = http.put("https://api.example.com/users/101", {"name": "New Name"})
+
+# Partial update (PATCH)
+res = http.patch("https://api.example.com/users/101", {"status": "active"})
+
+# Delete resource (DELETE)
+res = http.delete("https://api.example.com/users/101")
+```
+
+---
+
+#### 4. Handling Responses (`HttpResponse` Properties)
+
+| Property / Method | Description | Example |
+| :--- | :--- | :--- |
+| `res.status_code` | HTTP Status Code integer | `200`, `404`, `500` |
+| `res.ok` | `True` for 2xx status codes, otherwise `False` | `if res.ok:` |
+| `res.json()` | Parsed JSON body (dict or list) | `data = res.json()` |
+| `res.text` | Raw response decoded as UTF-8 string | `html = res.text` |
+| `res.headers` | Response headers dictionary | `content_type = res.headers.get("Content-Type")` |
+| `res.error` | Human-readable error message if request failed | `"HTTP 404: Not Found"` |
+| `res["field"]` | Direct subscription access for JSON bodies | `user_id = res["id"]` |
+| `res.get("field")` | Safe dictionary `.get()` fallback | `token = res.get("token", None)` |
 
 ---
 
