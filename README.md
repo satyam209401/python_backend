@@ -217,6 +217,7 @@ The `res` helper standardizes all API JSON responses across FastAPI endpoints, e
   }
   ```
 - **Smart Token Wrapping:** Passing a plain token string to `data` automatically formats it as `{"token": "<token_string>"}`.
+- **Automatic JSON String Parsing:** Agar `data` me raw JSON string (jaise Redis, database JSON column ya external API se aane wala string `'{"id": 101}'` ya `'[...]`) pass hota hai, toh `res` use automatically parse kar leta hai — aapko manually `json.loads()` karne ki jarurat nahi padti.
 
 ---
 
@@ -238,6 +239,11 @@ return res.s("Login successful", "FpzucUOkqbwzIT9BXQqtQLBwJoUyG")
 
 # 4. Custom status code (e.g. 201 Created)
 return res.s("User registered successfully", {"id": 102}, 201)
+
+# 5. Raw JSON string with Custom Status Code (e.g. 50000)
+# Automatically parses JSON string without needing manual `json.loads()`
+json_string = '{"id": 101, "name": "Rahul"}'
+return res.s("User data", json_string, 50000)
 ```
 
 ---
@@ -260,6 +266,48 @@ return res.e("Validation failed", 422, errors_list)
 
 # 5. 500 Internal Server Error
 return res.e("Database operation failed", 500)
+```
+
+---
+
+#### 3. Client-Side Data Extraction (Frontend & Python me Data Kaise Read Karein)
+
+Jab server `return res.s("User data", json_string, 50000)` return karta hai, toh client ko hamesha standardized response milti hai:
+
+```json
+{
+  "status": true,
+  "status_code": 50000,
+  "message": "User data",
+  "data": {
+    "id": 101,
+    "name": "Rahul"
+  }
+}
+```
+
+##### A. JavaScript / Frontend (Fetch / Axios)
+```javascript
+// Fetch Example:
+const response = await fetch("/api/user/profile");
+const result = await response.json();
+
+console.log(result.status_code); // 50000
+console.log(result.message);     // "User data"
+
+// Data access:
+const user = result.data;
+console.log(user.name);          // "Rahul"
+console.log(user.id);            // 101
+```
+
+##### B. Python Client (`http`)
+```python
+res = http.get("http://127.0.0.1:8000/api/user/profile")
+
+print(res["status_code"])        # 50000
+print(res["data"]["name"])       # "Rahul"
+print(res["data"]["id"])         # 101
 ```
 
 ---

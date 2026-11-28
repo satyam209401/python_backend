@@ -1,3 +1,4 @@
+import json
 from fastapi.responses import JSONResponse
 
 HEADERS = {
@@ -7,10 +8,29 @@ HEADERS = {
 }
 
 
+def _parse_if_json(val):
+    if isinstance(val, str):
+        s = val.strip()
+        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+            try:
+                return json.loads(s)
+            except Exception:
+                pass
+    return val
+
+
 class Response:
     @staticmethod
     def _send(status, message=False, data=None, code=200, http_code=None):
         final_http_code = code if http_code is None else http_code
+
+        parsed_message = _parse_if_json(message)
+        if isinstance(parsed_message, (dict, list)) and data is None:
+            data = parsed_message
+            message = False
+
+        data = _parse_if_json(data)
+
         return JSONResponse(
             content={
                 "status": status,
@@ -32,3 +52,4 @@ class Response:
 
 
 res = Response
+
