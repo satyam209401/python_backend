@@ -216,7 +216,8 @@ The `res` helper standardizes all API JSON responses across FastAPI endpoints, e
     "data": []
   }
   ```
-- **Smart Token Wrapping:** Passing a plain token string to `data` automatically formats it as `{"token": "<token_string>"}`.
+- **Flexible Argument Order & Safe Defaults:** Arguments ko kisi bhi order me pass kiya ja sakta hai (`res.s(message, data)` ya `res.s(data, message)`). Sirf message pass karne par `data` hamesha clean `[]` rehta hai.
+- **Safe HTTP Header Fallback:** Custom business codes (jaise `6000`, `9001` ya large codes) pass karne par browser/Axios network crash se bachane ke liye HTTP status header safe `200` (success) ya `400` (error) par fallback hota hai, jabki JSON ke andar exact custom `status_code` rehta hai.
 - **Automatic JSON String Parsing:** Agar `data` me raw JSON string (jaise Redis, database JSON column ya external API se aane wala string `'{"id": 101}'` ya `'[...]`) pass hota hai, toh `res` use automatically parse kar leta hai — aapko manually `json.loads()` karne ki jarurat nahi padti.
 
 ---
@@ -224,90 +225,27 @@ The `res` helper standardizes all API JSON responses across FastAPI endpoints, e
 ### Response Methods
 
 #### 1. Success Response: `res.s()`
-Use `res.s(message=False, data=None, code=200)` to return a successful response:
-
 ```python
-# 1. Simple success message
-return res.s("Operation completed successfully")
+# 1. Sirf message
+return res.s("Profile updated successfully.")
+# HTTP: 200 | JSON: {"status": true, "status_code": 200, "message": "Profile updated successfully.", "data": []}
 
-# 2. Return data dictionary or list
-return res.s("User profile retrieved", {"id": 101, "name": "Rahul"})
-
-# 3. Return a token string (automatically wrapped as {"token": "..."})
-return res.s("Login successful", "FpzucUOkqbwzIT9BXQqtQLBwJoUyG")
-# Output JSON data field: {"token": "FpzucUOkqbwzIT9BXQqtQLBwJoUyG"}
-
-# 4. Custom status code (e.g. 201 Created)
-return res.s("User registered successfully", {"id": 102}, 201)
-
-# 5. Raw JSON string with Custom Status Code (e.g. 50000)
-# Automatically parses JSON string without needing manual `json.loads()`
-json_string = '{"id": 101, "name": "Rahul"}'
-return res.s("User data", json_string, 50000)
+# 2. Message + data + custom flow code (e.g., 6000)
+return res.s("Two-step verification required.", {"challenge_id": "chk_98a7b6c5"}, 6000)
+# HTTP: 200 | JSON: {"status": true, "status_code": 6000, "message": "Two-step verification required.", "data": {"challenge_id": "chk_98a7b6c5"}}
 ```
 
 ---
 
 #### 2. Error Response: `res.e()`
-Use `res.e(message="error", code=400, data=None)` to return an error response:
-
 ```python
-# 1. 400 Bad Request
-return res.e("Invalid request parameter")
+# 1. Unauthorized (401)
+return res.e("Your session has expired. Please reopen Swarg Marg and sign in again.", 401)
+# HTTP: 401 | JSON: {"status": false, "status_code": 401, "message": "Your session has expired. Please reopen Swarg Marg and sign in again.", "data": []}
 
-# 2. 401 Unauthorized
-return res.e("Invalid or expired session token", 401)
-
-# 3. 404 Not Found
-return res.e("User record not found", 404)
-
-# 4. 422 Validation Error with detailed error list
-return res.e("Validation failed", 422, errors_list)
-
-# 5. 500 Internal Server Error
-return res.e("Database operation failed", 500)
-```
-
----
-
-#### 3. Client-Side Data Extraction (Frontend & Python me Data Kaise Read Karein)
-
-Jab server `return res.s("User data", json_string, 50000)` return karta hai, toh client ko hamesha standardized response milti hai:
-
-```json
-{
-  "status": true,
-  "status_code": 50000,
-  "message": "User data",
-  "data": {
-    "id": 101,
-    "name": "Rahul"
-  }
-}
-```
-
-##### A. JavaScript / Frontend (Fetch / Axios)
-```javascript
-// Fetch Example:
-const response = await fetch("/api/user/profile");
-const result = await response.json();
-
-console.log(result.status_code); // 50000
-console.log(result.message);     // "User data"
-
-// Data access:
-const user = result.data;
-console.log(user.name);          // "Rahul"
-console.log(user.id);            // 101
-```
-
-##### B. Python Client (`http`)
-```python
-res = http.get("http://127.0.0.1:8000/api/user/profile")
-
-print(res["status_code"])        # 50000
-print(res["data"]["name"])       # "Rahul"
-print(res["data"]["id"])         # 101
+# 2. Validation error with extra data (422)
+return res.e("Invalid request payload.", 422, {"field": "email", "reason": "Invalid format"})
+# HTTP: 422 | JSON: {"status": false, "status_code": 422, "message": "Invalid request payload.", "data": {"field": "email", "reason": "Invalid format"}}
 ```
 
 ---
